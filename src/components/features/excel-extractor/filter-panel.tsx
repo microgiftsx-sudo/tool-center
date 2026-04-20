@@ -1,0 +1,110 @@
+"use client"
+
+import { Input } from "@/components/ui/input"
+import { Label } from "@/components/ui/label"
+import { Checkbox } from "@/components/ui/checkbox"
+import { Button } from "@/components/ui/button"
+import { X } from "lucide-react"
+import {
+  Select,
+  SelectContent,
+  SelectItem,
+  SelectTrigger,
+  SelectValue,
+} from "@/components/ui/select"
+
+interface FilterPanelProps {
+  headers: string[]
+  filterColumn: string
+  filterValue: string
+  selectedColumns: string[]
+  onColumnChange: (col: string) => void
+  onValueChange: (val: string) => void
+  onToggleColumn: (col: string) => void
+  onClearFilter: () => void
+}
+
+export function FilterPanel({
+  headers,
+  filterColumn,
+  filterValue,
+  selectedColumns,
+  onColumnChange,
+  onValueChange,
+  onToggleColumn,
+  onClearFilter,
+}: FilterPanelProps) {
+  return (
+    <div className="space-y-4 p-5 border rounded-xl bg-muted/20">
+      {/* Filter row */}
+      <div className="grid grid-cols-1 sm:grid-cols-2 gap-4">
+        <div className="space-y-1.5">
+          <Label>البحث في عمود</Label>
+          <Select
+            value={filterColumn || "__all__"}
+            onValueChange={(v) => onColumnChange(v === "__all__" ? "" : v)}
+          >
+            <SelectTrigger>
+              <SelectValue placeholder="اختر عموداً أو ابحث في الكل" />
+            </SelectTrigger>
+            <SelectContent>
+              <SelectItem value="__all__">— البحث في كل الأعمدة —</SelectItem>
+              {headers.map((h) => (
+                <SelectItem key={h} value={h}>{h}</SelectItem>
+              ))}
+            </SelectContent>
+          </Select>
+        </div>
+
+        <div className="space-y-1.5">
+          <Label>قيمة البحث</Label>
+          <div className="flex gap-2">
+            <Input
+              placeholder="اكتب للبحث..."
+              value={filterValue}
+              onChange={(e) => onValueChange(e.target.value)}
+            />
+            {filterValue && (
+              <Button variant="ghost" size="icon" onClick={onClearFilter} className="shrink-0">
+                <X className="w-4 h-4" />
+              </Button>
+            )}
+          </div>
+        </div>
+      </div>
+
+      {/* Column visibility */}
+      <div className="space-y-2">
+        <div className="flex items-center justify-between">
+          <Label>الأعمدة المعروضة</Label>
+          <div className="flex gap-2 text-xs text-muted-foreground">
+            <button
+              onClick={() => headers.forEach((h) => !selectedColumns.includes(h) && onToggleColumn(h))}
+              className="hover:text-foreground transition-colors"
+            >
+              تحديد الكل
+            </button>
+            <span>·</span>
+            <button
+              onClick={() => headers.forEach((h) => selectedColumns.includes(h) && onToggleColumn(h))}
+              className="hover:text-foreground transition-colors"
+            >
+              إلغاء الكل
+            </button>
+          </div>
+        </div>
+        <div className="flex flex-wrap gap-3 pt-1">
+          {headers.map((h) => (
+            <label key={h} className="flex items-center gap-2 cursor-pointer select-none">
+              <Checkbox
+                checked={selectedColumns.includes(h)}
+                onCheckedChange={() => onToggleColumn(h)}
+              />
+              <span className="text-sm">{h}</span>
+            </label>
+          ))}
+        </div>
+      </div>
+    </div>
+  )
+}
