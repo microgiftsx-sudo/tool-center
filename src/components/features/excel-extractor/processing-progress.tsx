@@ -2,16 +2,15 @@
 
 import { useEffect, useState } from "react"
 import { CheckCircle2, Loader2 } from "lucide-react"
-import { Progress } from "@/components/ui/progress"
 import { cn } from "@/lib/utils"
 
 export type ProcessingStep = "idle" | "reading" | "parsing" | "rendering" | "done"
 
 const STEPS: { key: ProcessingStep; label: string; pct: number }[] = [
-  { key: "reading",   label: "قراءة الملف...",       pct: 30 },
-  { key: "parsing",   label: "تحليل البيانات...",    pct: 65 },
-  { key: "rendering", label: "تجهيز العرض...",       pct: 90 },
-  { key: "done",      label: "اكتمل بنجاح!",         pct: 100 },
+  { key: "reading",   label: "قراءة الملف",    pct: 30 },
+  { key: "parsing",   label: "تحليل البيانات", pct: 65 },
+  { key: "rendering", label: "تجهيز العرض",    pct: 90 },
+  { key: "done",      label: "اكتمل بنجاح",    pct: 100 },
 ]
 
 interface ProcessingProgressProps {
@@ -32,8 +31,11 @@ export function ProcessingProgress({ step }: ProcessingProgressProps) {
 
   if (step === "idle") return null
 
+  const currentIndex = STEPS.findIndex((s) => s.key === step)
+
   return (
     <div className="space-y-3 py-6 px-4 border rounded-xl bg-muted/20 animate-in fade-in">
+      {/* Label + percentage */}
       <div className="flex items-center justify-between text-sm">
         <span className="font-medium text-foreground">
           {step === "done" ? (
@@ -44,22 +46,25 @@ export function ProcessingProgress({ step }: ProcessingProgressProps) {
           ) : (
             <span className="flex items-center gap-1.5 text-muted-foreground">
               <Loader2 className="w-4 h-4 animate-spin" />
-              {current?.label}
+              {current?.label}...
             </span>
           )}
         </span>
         <span className="tabular-nums text-muted-foreground">{displayPct}%</span>
       </div>
 
-      {/* dir="ltr" so the bar fills from right → left in RTL layout */}
-      <div dir="ltr">
-        <Progress value={displayPct} className="h-2 transition-all duration-500" />
+      {/* RTL-native progress bar: fills from right to left */}
+      <div className="relative h-2 w-full overflow-hidden rounded-full bg-primary/20">
+        <div
+          className="absolute top-0 right-0 h-full bg-primary rounded-full transition-all duration-500 ease-in-out"
+          style={{ width: `${displayPct}%` }}
+        />
       </div>
 
+      {/* Step dots — right to left order */}
       <div className="flex justify-between">
         {[...STEPS].reverse().map(({ key, label }) => {
           const stepIndex = STEPS.findIndex((s) => s.key === key)
-          const currentIndex = STEPS.findIndex((s) => s.key === step)
           const passed = stepIndex < currentIndex
           const active = key === step
 
@@ -76,7 +81,7 @@ export function ProcessingProgress({ step }: ProcessingProgressProps) {
                 "text-[10px] hidden sm:block",
                 active ? "text-foreground font-medium" : "text-muted-foreground"
               )}>
-                {label.replace("...", "")}
+                {label}
               </span>
             </div>
           )
