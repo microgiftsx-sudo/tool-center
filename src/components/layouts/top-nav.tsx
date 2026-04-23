@@ -1,12 +1,30 @@
 "use client"
 
 import Link from "next/link"
-import { usePathname } from "next/navigation"
-import { LayoutGrid } from "lucide-react"
+import { usePathname, useRouter } from "next/navigation"
+import { LayoutGrid, LogOut } from "lucide-react"
 import { cn } from "@/lib/utils"
+import { Button } from "@/components/ui/button"
+import { useAuthStore } from "@/store/auth/authStore"
+import apiClient from "@/lib/axiosClients"
+import { toast } from "sonner"
 
 export default function TopNav() {
   const pathname = usePathname()
+  const router = useRouter()
+  const user = useAuthStore((s) => s.user)
+  const clearAuth = useAuthStore((s) => s.clearAuth)
+
+  async function handleLogout() {
+    try {
+      await apiClient.post("/api/auth/logout")
+    } catch {
+      // ignore server logout errors, always clear local session
+    }
+    clearAuth()
+    toast.success("تم تسجيل الخروج")
+    router.push("/login")
+  }
 
   return (
     <header className="sticky top-0 z-40 border-b border-primary/15 bg-background/95 backdrop-blur supports-[backdrop-filter]:bg-background/80 shadow-sm">
@@ -20,8 +38,8 @@ export default function TopNav() {
           <span className="font-bold text-base tracking-tight text-foreground">مركز الأدوات</span>
         </Link>
 
-        {/* Home link only */}
-        <nav>
+        {/* Navigation + auth actions */}
+        <nav className="flex items-center gap-2">
           <Link
             href="/"
             className={cn(
@@ -34,6 +52,18 @@ export default function TopNav() {
             <LayoutGrid className="w-4 h-4 shrink-0" />
             <span className="hidden sm:inline">الرئيسية</span>
           </Link>
+
+          {user && (
+            <Button
+              variant="outline"
+              size="sm"
+              className="gap-2"
+              onClick={handleLogout}
+            >
+              <LogOut className="w-4 h-4" />
+              <span className="hidden sm:inline">تسجيل خروج</span>
+            </Button>
+          )}
         </nav>
 
       </div>

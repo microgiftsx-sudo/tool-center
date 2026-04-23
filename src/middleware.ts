@@ -10,14 +10,14 @@ export default function middleware(request: NextRequest) {
   const isPublicRoute = PUBLIC_ROUTES.some(route => pathname.startsWith(route))
   
   // If user has token and tries to access auth pages, redirect to home
-  // if (isPublicRoute && token) {
-  //   return NextResponse.redirect(new URL('/', request.url))
-  // }
+  if (isPublicRoute && token) {
+    return NextResponse.redirect(new URL('/', request.url))
+  }
 
   // If user doesn't have token and tries to access protected routes, redirect to login
-  // if (!isPublicRoute && !token) {
-  //   return NextResponse.redirect(new URL('/login', request.url))
-  // }
+  if (!isPublicRoute && !token) {
+    return NextResponse.redirect(new URL('/login', request.url))
+  }
 
   return NextResponse.next()
 }

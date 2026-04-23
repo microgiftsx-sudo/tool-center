@@ -1,5 +1,6 @@
 "use client";
 
+import Link from "next/link";
 import { useState } from "react";
 import { useRouter } from "next/navigation";
 import { Button } from "@/components/ui/button";
@@ -30,6 +31,17 @@ export default function LoginPage() {
   const [accessToken, setAccessToken] = useState<string>("");
 
   const { login, changePassword, loading } = useAuth();
+
+  function resolveError(error: unknown): { message: string; field?: string } {
+    if (typeof error === "object" && error !== null) {
+      const err = error as { response?: { status?: number; data?: { message?: string; field?: string } } }
+      const apiMsg = err.response?.data?.message;
+      const field = err.response?.data?.field;
+      if (apiMsg) return { message: apiMsg, field };
+      if (err.response?.status === 401) return { message: "بيانات تسجيل الدخول غير صحيحة" };
+    }
+    return { message: "فشل في تسجيل الدخول. يرجى التحقق من البيانات والمحاولة مرة أخرى." };
+  }
 
   const handleInputChange = (field: keyof LoginFormData) => (
     e: React.ChangeEvent<HTMLInputElement>
@@ -106,7 +118,11 @@ export default function LoginPage() {
         },
         onError: (error: unknown) => {
           console.error("Login error:", error);
-          toast.error("فشل في تسجيل الدخول. يرجى التحقق من البيانات والمحاولة مرة أخرى.");
+          const resolved = resolveError(error);
+          if (resolved.field) {
+            setErrors((prev) => ({ ...prev, [resolved.field as string]: resolved.message }));
+          }
+          toast.error(resolved.message);
         }
       });
     } catch (error) {
@@ -150,7 +166,8 @@ export default function LoginPage() {
         },
         onError: (error: unknown) => {
           console.error("Change password error:", error);
-          toast.error("فشل في تغيير كلمة المرور. يرجى المحاولة مرة أخرى.");
+          const resolved = resolveError(error);
+          toast.error(resolved.message);
         }
       });
     } catch (error) {
@@ -221,6 +238,12 @@ export default function LoginPage() {
                   تسجيل الدخول
                 </Button>
               </form>
+              <p className="text-sm text-center text-muted-foreground mt-4">
+                ليس لديك حساب؟{" "}
+                <Link href="/register" className="text-primary hover:underline">
+                  إنشاء حساب
+                </Link>
+              </p>
             </CardContent>
           </>
         ) : (

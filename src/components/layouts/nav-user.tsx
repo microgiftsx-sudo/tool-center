@@ -35,13 +35,19 @@ import {
 } from "@/components/ui/sidebar"
 import { useTheme } from "@/context/theme-context"
 import { useAuthStore } from "@/store/auth/authStore"
+import apiClient from "@/lib/axiosClients"
 
 export function NavUser() {
   const { isMobile } = useSidebar()
   const router = useRouter()
   const { user, clearAuth } = useAuthStore()
 
-  const handleLogout = () => {
+  const handleLogout = async () => {
+    try {
+      await apiClient.post("/api/auth/logout")
+    } catch {
+      // ignore logout API errors and always clear local session
+    }
     clearAuth() // Clears localStorage + cookie
     router.push('/login')
   }
