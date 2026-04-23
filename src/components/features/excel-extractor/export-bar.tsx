@@ -19,30 +19,9 @@ export function ExportBar({ headers, allRows, selectedRows, fileName }: ExportBa
   const label = selectedRows.length > 0
     ? `تصدير المحدد (${selectedRows.length})`
     : `تصدير الكل (${allRows.length})`
+  const hasData = headers.length > 0 && exportTarget.length > 0
 
-  function exportExcel() {
-    const data = exportTarget.map((row) => {
-      const r: Record<string, unknown> = {}
-      headers.forEach((h) => { r[h] = row[h] ?? "" })
-      return r
-    })
-    const ws = XLSX.utils.json_to_sheet(data, { header: headers })
-    const wb = XLSX.utils.book_new()
-    XLSX.utils.book_append_sheet(wb, ws, "النتائج")
-    XLSX.writeFile(wb, `${fileName}_extracted.xlsx`)
-    toast.success("تم تصدير الملف بنجاح")
-  }
-
-  async function copyToClipboard() {
-    try {
-      await copyTableToClipboard(headers, exportTarget)
-      toast.success(`تم نسخ ${exportTarget.length} صف — الصقها في Excel أو Word`)
-    } catch {
-      toast.error("تعذّر النسخ")
-    }
-  }
-
-  function printTable() {
+  function buildPrintHtml() {
     const thCells = headers
       .map((h) => `<th>${h}</th>`)
       .join("")
@@ -53,10 +32,7 @@ export function ExportBar({ headers, allRows, selectedRows, fileName }: ExportBa
       })
       .join("")
 
-    const win = window.open("", "_blank", "width=1000,height=700")
-    if (!win) { toast.error("تعذّر فتح نافذة الطباعة"); return }
-
-    win.document.write(`<!DOCTYPE html>
+    return `<!DOCTYPE html>
 <html dir="rtl" lang="ar">
 <head>
   <meta charset="UTF-8">
@@ -96,8 +72,94 @@ export function ExportBar({ headers, allRows, selectedRows, fileName }: ExportBa
   </table>
   <script>window.onload = () => { window.print(); window.close(); }<\/script>
 </body>
-</html>`)
-    win.document.close()
+</html>`
+  }
+
+  function exportExcel() {
+    if (!hasData) {
+      toast.error("لا توجد بيانات للتصدير")
+      return
+    }
+    const data = exportTarget.map((row) => {
+      const r: Record<string, unknown> = {}
+      headers.forEach((h) => { r[h] = row[h] ?? "" })
+      return r
+    })
+    const ws = XLSX.utils.json_to_sheet(data, { header: headers })
+    const wb = XLSX.utils.book_new()
+    XLSX.utils.book_append_sheet(wb, ws, "النتائج")
+    XLSX.writeFile(wb, `${fileName}_extracted.xlsx`)
+    toast.success("تم تصدير الملف بنجاح")
+  }
+
+  async function copyToClipboard() {
+    if (!hasData) {
+      toast.error("لا توجد بيانات للنسخ")
+      return
+    }
+    try {
+      await copyTableToClipboard(headers, exportTarget)
+      toast.success(`تم نسخ ${exportTarget.length} صف — الصقها في Excel أو Word`)
+    } catch {
+      try {
+        // Fallback for browsers/webviews where Clipboard API is blocked
+        const tsv = [
+          headers.join("\t"),
+          ...exportTarget.map((r) => headers.map((h) => String(r[h] ?? "")).join("\t")),
+        ].join("\n")
+        const ta = document.createElement("textarea")
+        ta.value = tsv
+        ta.style.position = "fixed"
+        ta.style.top = "-9999px"
+        document.body.appendChild(ta)
+        ta.focus()
+        ta.select()
+        const ok = document.execCommand("copy")
+        document.body.removeChild(ta)
+        if (!ok) throw new Error("execCommand copy failed")
+        toast.success(`تم نسخ ${exportTarget.length} صف`)
+      } catch {
+        toast.error("تعذّر النسخ على هذا المتصفح")
+      }
+    }
+  }
+
+  function printTable() {
+    if (!hasData) {
+      toast.error("لا توجد بيانات للطباعة")
+      return
+    }
+
+    const win = window.open("", "_blank", "width=1000,height=700")
+    if (win) {
+      win.document.write(buildPrintHtml())
+      win.document.close()
+      return
+    }
+
+    // Fallback for popup-blocked mobile browsers: print via hidden iframe
+    const iframe = document.createElement("iframe")
+    iframe.style.position = "fixed"
+    iframe.style.right = "0"
+    iframe.style.bottom = "0"
+    iframe.style.width = "0"
+    iframe.style.height = "0"
+    iframe.style.border = "0"
+    document.body.appendChild(iframe)
+    const doc = iframe.contentWindow?.document
+    if (!doc || !iframe.contentWindow) {
+      toast.error("تعذّر فتح الطباعة")
+      document.body.removeChild(iframe)
+      return
+    }
+    doc.open()
+    doc.write(buildPrintHtml())
+    doc.close()
+    setTimeout(() => {
+      iframe.contentWindow?.focus()
+      iframe.contentWindow?.print()
+      setTimeout(() => document.body.removeChild(iframe), 1000)
+    }, 250)
   }
 
   return (
@@ -111,11 +173,11 @@ export function ExportBar({ headers, allRows, selectedRows, fileName }: ExportBa
         <Download className="w-4 h-4" />
         {label}
       </Button>
-      <Button variant="outline" onClick={copyToClipboard} className="gap-2 border-primary/30 hover:bg-primary/10 hover:text-primary flex-1 sm:flex-none">
+      <Button variant="outline" onClick={copyToClipboard} className="gap-2 border-primary/30 hover:bg-primary/10 hover:text-primary flex-1 sm:flex-none" disabled={!hasData}>
         <Copy className="w-4 h-4" />
         نسخ
       </Button>
-      <Button variant="outline" onClick={printTable} className="gap-2 border-primary/30 hover:bg-primary/10 hover:text-primary flex-1 sm:flex-none">
+      <Button variant="outline" onClick={printTable} className="gap-2 border-primary/30 hover:bg-primary/10 hover:text-primary flex-1 sm:flex-none" disabled={!hasData}>
         <Printer className="w-4 h-4" />
         طباعة {selectedRows.length > 0 ? `(${selectedRows.length})` : `(${allRows.length})`}
       </Button>

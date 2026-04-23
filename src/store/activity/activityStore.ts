@@ -29,6 +29,7 @@ export interface ActivityEntry {
 interface ActivityState {
   entries: ActivityEntry[]
   isInitialized: boolean
+  isLoading: boolean
 }
 
 interface ActivityActions {
@@ -63,6 +64,7 @@ function loadEntriesFromLocal(): ActivityEntry[] {
 export const useActivityStore = create<ActivityStore>()((set, get) => ({
   entries: [],
   isInitialized: false,
+  isLoading: false,
 
   // ── Initialize from API ──────────────────────────────────────────────────────
   initialize: async () => {
@@ -75,6 +77,7 @@ export const useActivityStore = create<ActivityStore>()((set, get) => ({
       return
     }
 
+    set({ isLoading: true })
     try {
       const res = await apiClient.get<{ data: { items: Record<string, unknown>[] } }>("/activity?limit=20")
       const items = (res.data as { data?: { items?: Record<string, unknown>[] } })?.data?.items ?? []
@@ -89,6 +92,8 @@ export const useActivityStore = create<ActivityStore>()((set, get) => ({
       set({ entries, isInitialized: true })
     } catch {
       set({ entries: localEntries, isInitialized: true })
+    } finally {
+      set({ isLoading: false })
     }
   },
 

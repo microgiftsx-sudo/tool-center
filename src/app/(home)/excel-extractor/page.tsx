@@ -1,6 +1,6 @@
 "use client"
 
-import { useState, useMemo, useCallback, useEffect } from "react"
+import { useState, useMemo, useCallback, useEffect, useRef } from "react"
 import * as XLSX from "xlsx"
 import { CheckCircle2, FileSpreadsheet, Loader2, X, Trash2 } from "lucide-react"
 import { Button } from "@/components/ui/button"
@@ -35,6 +35,8 @@ export default function ExcelExtractorPage() {
   const [colorModalKey, setColorModalKey] = useState(0)
   const [mounted, setMounted] = useState(false)
   const [dbHealth, setDbHealth] = useState<"idle" | "checking" | "ok" | "fail">("idle")
+  const [dbLastCheckedAt, setDbLastCheckedAt] = useState<string>("")
+  const dbCheckInFlightRef = useRef(false)
   useEffect(() => { setMounted(true) }, [])
 
   // ── Persisted store state ────────────────────────────────────────────────────
@@ -47,11 +49,13 @@ export default function ExcelExtractorPage() {
     recentFiles,
     settingsRestoredFrom, clearRestoredHint,
     resetSettings,
+    isLoading: extractorSyncLoading,
   } = useExcelExtractorStore()
 
   const logActivity = useActivityStore((s) => s.log)
   const savedSelection = useExtractedSelectionStore((s) => s.savedSelection)
   const savedSelectionInitialized = useExtractedSelectionStore((s) => s.isInitialized)
+  const savedSelectionLoading = useExtractedSelectionStore((s) => s.isLoading)
   const loadSavedSelection = useExtractedSelectionStore((s) => s.fetchSavedSelection)
   const saveSelection = useExtractedSelectionStore((s) => s.saveSelection)
   const clearSavedSelection = useExtractedSelectionStore((s) => s.clearSavedSelection)
@@ -210,23 +214,36 @@ export default function ExcelExtractorPage() {
   const isFilterActive = filterValue.trim().length > 0
   const hasActiveFileView = !!fileName && visibleHeaders.length > 0
 
-  async function checkDatabaseHealth() {
+  async function checkDatabaseHealth(showToast = true) {
+    if (dbCheckInFlightRef.current) return
+    dbCheckInFlightRef.current = true
     setDbHealth("checking")
     try {
       const res = await fetch("/api/db-health", { method: "GET", cache: "no-store" })
       const data = (await res.json()) as { ok?: boolean; message?: string }
+      setDbLastCheckedAt(new Date().toLocaleTimeString("ar-SA", { hour: "2-digit", minute: "2-digit" }))
       if (data.ok) {
         setDbHealth("ok")
-        toast.success("اتصال قاعدة البيانات يعمل")
+        if (showToast) toast.success("اتصال قاعدة البيانات يعمل")
       } else {
         setDbHealth("fail")
-        toast.error(data.message || "قاعدة البيانات غير متصلة")
+        if (showToast) toast.error(data.message || "قاعدة البيانات غير متصلة")
       }
     } catch {
       setDbHealth("fail")
-      toast.error("فشل فحص قاعدة البيانات")
+      if (showToast) toast.error("فشل فحص قاعدة البيانات")
+    } finally {
+      dbCheckInFlightRef.current = false
     }
   }
+
+  useEffect(() => {
+    checkDatabaseHealth(false)
+    const intervalId = window.setInterval(() => {
+      checkDatabaseHealth(false)
+    }, 15000)
+    return () => window.clearInterval(intervalId)
+  }, [])
 
   return (
     <div className="space-y-4 sm:space-y-5 w-full">
@@ -263,7 +280,13 @@ export default function ExcelExtractorPage() {
       {step !== "idle" && <ProcessingProgress step={step} />}
 
       {/* ── Recent files (shown only when no file loaded, after client hydration) ── */}
-      {mounted && !isProcessing && !fileName && recentFiles.length > 0 && (
+      {mounted && !isProcessing && !fileName && extractorSyncLoading && (
+        <div className="flex items-center justify-center gap-2 text-sm text-muted-foreground border rounded-xl px-4 py-6">
+          <Loader2 className="w-4 h-4 animate-spin" />
+          جاري تحميل إعدادات الملف والعمليات الأخيرة...
+        </div>
+      )}
+      {mounted && !isProcessing && !fileName && !extractorSyncLoading && recentFiles.length > 0 && (
         <RecentFilesSection
           onRestored={() => toast.success("تم استعادة إعدادات الملف السابق")}
         />
@@ -290,7 +313,7 @@ export default function ExcelExtractorPage() {
       {!isProcessing && !fileName && <FileUploadZone onFile={handleFile} />}
 
       {/* ── Main content (tabs) ── */}
-      {!isProcessing && savedSelectionInitialized && (hasActiveFileView || savedRows.length > 0) && (
+      {!isProcessing && (hasActiveFileView || savedRows.length > 0 || savedSelectionLoading || !savedSelectionInitialized) && (
         <div className="space-y-4">
 
           {/* Filter panel */}
@@ -503,10 +526,17 @@ export default function ExcelExtractorPage() {
                 </div>
 
                 {savedRows.length === 0 || savedHeaders.length === 0 ? (
+                  (!savedSelectionInitialized || savedSelectionLoading) ? (
+                    <div className="flex items-center justify-center gap-2 py-16 px-6 text-center text-muted-foreground">
+                      <Loader2 className="w-4 h-4 animate-spin" />
+                      <p className="text-sm">جاري تحميل الصفوف المحفوظة...</p>
+                    </div>
+                  ) : (
                   <div className="flex flex-col items-center justify-center py-16 px-6 text-center text-muted-foreground">
                     <FileSpreadsheet className="w-10 h-10 mb-3 opacity-20" />
                     <p className="text-sm">لا توجد صفوف محفوظة حتى الآن</p>
                   </div>
+                  )
                 ) : (
                   <div className="p-2 sm:p-3">
                     <ExportBar
@@ -565,7 +595,12 @@ export default function ExcelExtractorPage() {
             }`}
           />
           {dbHealth === "checking" && <Loader2 className="w-3.5 h-3.5 animate-spin" />}
-          حالة DB
+          {dbHealth === "ok" ? "DB متصل" : dbHealth === "fail" ? "DB غير متصل" : "حالة DB"}
+          {dbLastCheckedAt && (
+            <span className="text-[10px] text-muted-foreground/80 mr-1">
+              {dbLastCheckedAt}
+            </span>
+          )}
         </Button>
       </div>
 

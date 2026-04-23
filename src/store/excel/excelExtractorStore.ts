@@ -26,6 +26,7 @@ interface ExcelExtractorState {
   recentFiles: RecentFileEntry[]
   settingsRestoredFrom: string | null
   isInitialized: boolean
+  isLoading: boolean
 }
 
 interface ExcelExtractorActions {
@@ -55,6 +56,7 @@ const defaultState: ExcelExtractorState = {
   recentFiles: [],
   settingsRestoredFrom: null,
   isInitialized: false,
+  isLoading: false,
 }
 
 // Debounce helper
@@ -83,6 +85,7 @@ export const useExcelExtractorStore = create<ExcelExtractorStore>()((set, get) =
       return
     }
 
+    set({ isLoading: true })
     try {
       const [settingsRes, recentRes] = await Promise.all([
         apiClient.get("/settings/excel-extractor"),
@@ -106,9 +109,10 @@ export const useExcelExtractorStore = create<ExcelExtractorStore>()((set, get) =
         colorRules: s.colorRules ?? {},
         recentFiles: recent,
         isInitialized: true,
+        isLoading: false,
       })
     } catch {
-      set({ isInitialized: true })
+      set({ isInitialized: true, isLoading: false })
     }
   },
 

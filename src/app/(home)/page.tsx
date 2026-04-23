@@ -4,7 +4,7 @@ import Link from "next/link"
 import { useEffect, useState } from "react"
 import {
   FileSpreadsheet, ScanSearch,
-  Layers, ArrowLeftRight, Clock, Trash2, X,
+  Layers, ArrowLeftRight, Clock, Trash2, X, Loader2,
 } from "lucide-react"
 import { Badge } from "@/components/ui/badge"
 import { Button } from "@/components/ui/button"
@@ -96,7 +96,7 @@ function formatRelative(iso: string): string {
 // ── Page ─────────────────────────────────────────────────────────────────────
 
 export default function PortalPage() {
-  const { entries, clear, remove } = useActivityStore()
+  const { entries, clear, remove, isLoading: activityLoading, isInitialized: activityInitialized } = useActivityStore()
   const [mounted, setMounted] = useState(false)
   useEffect(() => { setMounted(true) }, [])
   useActivitySync()
@@ -130,7 +130,12 @@ export default function PortalPage() {
             )}
           </div>
 
-          {!mounted || entries.length === 0 ? (
+          {!mounted || (!activityInitialized && activityLoading) ? (
+            <div className="flex flex-col items-center justify-center py-14 px-4 border rounded-xl border-dashed text-center text-muted-foreground">
+              <Loader2 className="w-7 h-7 mb-3 animate-spin opacity-60" />
+              <p className="text-sm">جاري تحميل العمليات...</p>
+            </div>
+          ) : entries.length === 0 ? (
             <div className="flex flex-col items-center justify-center py-14 px-4 border rounded-xl border-dashed text-center text-muted-foreground">
               <Clock className="w-8 h-8 mb-3 opacity-20" />
               <p className="text-sm">لا توجد عمليات بعد</p>
