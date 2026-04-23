@@ -101,21 +101,21 @@ export function ExportBar({ headers, allRows, selectedRows, fileName }: ExportBa
   }
 
   return (
-    <div className="flex flex-wrap items-center gap-3 p-4 border rounded-xl bg-primary/5 border-primary/20">
+    <div className="flex flex-wrap items-stretch sm:items-center gap-2 sm:gap-3 p-3 sm:p-4 border rounded-xl bg-primary/5 border-primary/20">
       {selectedRows.length > 0 && (
-        <Badge className="text-xs gap-1 bg-primary/15 text-primary border-primary/30 hover:bg-primary/20">
+        <Badge className="text-xs gap-1 bg-primary/15 text-primary border-primary/30 hover:bg-primary/20 w-full sm:w-auto justify-center">
           {selectedRows.length} صف محدد
         </Badge>
       )}
-      <Button onClick={exportExcel} className="gap-2">
+      <Button onClick={exportExcel} className="gap-2 w-full sm:w-auto">
         <Download className="w-4 h-4" />
         {label}
       </Button>
-      <Button variant="outline" onClick={copyToClipboard} className="gap-2 border-primary/30 hover:bg-primary/10 hover:text-primary">
+      <Button variant="outline" onClick={copyToClipboard} className="gap-2 border-primary/30 hover:bg-primary/10 hover:text-primary flex-1 sm:flex-none">
         <Copy className="w-4 h-4" />
         نسخ
       </Button>
-      <Button variant="outline" onClick={printTable} className="gap-2 border-primary/30 hover:bg-primary/10 hover:text-primary">
+      <Button variant="outline" onClick={printTable} className="gap-2 border-primary/30 hover:bg-primary/10 hover:text-primary flex-1 sm:flex-none">
         <Printer className="w-4 h-4" />
         طباعة {selectedRows.length > 0 ? `(${selectedRows.length})` : `(${allRows.length})`}
       </Button>

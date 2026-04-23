@@ -35,9 +35,9 @@ export function FilterPanel({
   onClearFilter,
 }: FilterPanelProps) {
   return (
-    <div className="space-y-4 p-5 border rounded-xl bg-muted/20">
+    <div className="space-y-4 p-3 sm:p-5 border rounded-xl bg-muted/20">
       {/* Filter row */}
-      <div className="grid grid-cols-1 sm:grid-cols-2 gap-4">
+      <div className="grid grid-cols-1 sm:grid-cols-2 gap-3 sm:gap-4">
         <div className="space-y-1.5">
           <Label>البحث في عمود</Label>
           <Select
@@ -63,6 +63,7 @@ export function FilterPanel({
               placeholder="اكتب للبحث..."
               value={filterValue}
               onChange={(e) => onValueChange(e.target.value)}
+              className="text-sm"
             />
             {filterValue && (
               <Button variant="ghost" size="icon" onClick={onClearFilter} className="shrink-0">
@@ -93,7 +94,7 @@ export function FilterPanel({
             </button>
           </div>
         </div>
-        <div className="flex flex-wrap gap-3 pt-1">
+        <div className="flex flex-wrap gap-x-3 gap-y-2 pt-1 max-h-36 overflow-auto pr-1">
           {headers.map((h) => (
             <label key={h} className="flex items-center gap-2 cursor-pointer select-none">
               <Checkbox

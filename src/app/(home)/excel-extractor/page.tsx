@@ -229,21 +229,21 @@ export default function ExcelExtractorPage() {
   }
 
   return (
-    <div className="space-y-5 w-full">
+    <div className="space-y-4 sm:space-y-5 w-full">
 
       {/* ── Page header ── */}
-      <div className="flex items-center gap-3 flex-wrap">
-        <div className="w-10 h-10 rounded-xl bg-emerald-50 dark:bg-emerald-950/30 flex items-center justify-center shrink-0">
+      <div className="flex items-center gap-2.5 sm:gap-3 flex-wrap">
+        <div className="w-9 h-9 sm:w-10 sm:h-10 rounded-xl bg-emerald-50 dark:bg-emerald-950/30 flex items-center justify-center shrink-0">
           <FileSpreadsheet className="w-5 h-5 text-emerald-600" />
         </div>
         <div>
-          <h1 className="text-xl font-bold">استخراج بيانات Excel</h1>
-          <p className="text-sm text-muted-foreground">صفّ البيانات، لوّن الأعمدة، حدّد الصفوف، وصدّر ما تحتاجه</p>
+          <h1 className="text-lg sm:text-xl font-bold">استخراج بيانات Excel</h1>
+          <p className="text-xs sm:text-sm text-muted-foreground">صفّ البيانات، لوّن الأعمدة، حدّد الصفوف، وصدّر ما تحتاجه</p>
         </div>
 
         {/* Auto-save indicator */}
         {fileName && !isProcessing && (
-          <span className="text-[11px] text-muted-foreground/60 flex items-center gap-1.5 mr-auto">
+          <span className="text-[10px] sm:text-[11px] text-muted-foreground/60 flex items-center gap-1.5 mr-auto">
             <span className="w-1.5 h-1.5 rounded-full bg-emerald-400 animate-pulse" />
             حفظ تلقائي للإعدادات
           </span>
@@ -251,7 +251,7 @@ export default function ExcelExtractorPage() {
 
         {/* File reset button */}
         {fileName && !isProcessing && (
-          <Button variant="ghost" size="sm" className="gap-1.5 text-muted-foreground" onClick={reset}>
+          <Button variant="ghost" size="sm" className="gap-1.5 text-muted-foreground w-full sm:w-auto justify-center sm:justify-start" onClick={reset}>
             <X className="w-4 h-4" />
             {fileName}
           </Button>
@@ -309,9 +309,10 @@ export default function ExcelExtractorPage() {
 
           {/* Tabs */}
           <Tabs defaultValue={hasActiveFileView ? "browse" : "saved"}>
-            <TabsList className="w-full">
+            <div className="overflow-x-auto -mx-1 px-1 pb-1">
+              <TabsList className="w-full min-w-max sm:min-w-0 sm:w-full">
               {hasActiveFileView && (
-                <TabsTrigger value="browse" className="flex-1 gap-2">
+                <TabsTrigger value="browse" className="flex-1 min-w-[130px] sm:min-w-0 gap-2 text-xs sm:text-sm">
                   جميع الصفوف
                   <Badge variant="secondary" className="text-xs">{filteredIndices.length}</Badge>
                   {isFilterActive && (
@@ -320,7 +321,7 @@ export default function ExcelExtractorPage() {
                 </TabsTrigger>
               )}
               {hasActiveFileView && (
-                <TabsTrigger value="selected" className="flex-1 gap-2">
+                <TabsTrigger value="selected" className="flex-1 min-w-[130px] sm:min-w-0 gap-2 text-xs sm:text-sm">
                   الصفوف المحددة
                   {selectedKeys.size > 0 && (
                     <Badge className="text-xs bg-primary/15 text-primary border-primary/30">
@@ -329,7 +330,7 @@ export default function ExcelExtractorPage() {
                   )}
                 </TabsTrigger>
               )}
-              <TabsTrigger value="saved" className="flex-1 gap-2">
+              <TabsTrigger value="saved" className="flex-1 min-w-[130px] sm:min-w-0 gap-2 text-xs sm:text-sm">
                 المحفوظ محليًا
                 {savedRows.length > 0 && (
                   <Badge variant="secondary" className="text-xs">
@@ -337,7 +338,8 @@ export default function ExcelExtractorPage() {
                   </Badge>
                 )}
               </TabsTrigger>
-            </TabsList>
+              </TabsList>
+            </div>
 
             {/* ── Tab 1: Browse & select ── */}
             {hasActiveFileView && (
@@ -368,9 +370,9 @@ export default function ExcelExtractorPage() {
             {hasActiveFileView && (
               <TabsContent value="selected" className="mt-3">
               <div className="border rounded-xl overflow-hidden">
-                <div className="flex items-center justify-between px-4 py-3 border-b bg-primary/5">
+                <div className="flex flex-col sm:flex-row sm:items-center justify-between gap-2 px-3 sm:px-4 py-3 border-b bg-primary/5">
                   <span className="font-semibold text-sm text-primary">الصفوف المحددة</span>
-                  <div className="flex items-center gap-2">
+                  <div className="flex items-center gap-2 self-end sm:self-auto">
                     <Badge className="bg-primary/15 text-primary border-primary/30 hover:bg-primary/20">
                       {selectedKeys.size} صف
                     </Badge>
@@ -394,11 +396,11 @@ export default function ExcelExtractorPage() {
                   </div>
                 ) : (
                   <div className="flex flex-col">
-                    <div className="flex items-center justify-between px-4 py-2 border-b bg-muted/20">
-                      <p className="text-xs text-muted-foreground">
+                    <div className="flex flex-col sm:flex-row sm:items-center justify-between gap-2 px-3 sm:px-4 py-2 border-b bg-muted/20">
+                      <p className="text-xs text-muted-foreground leading-relaxed">
                         احفظ التحديد الحالي ليبقى بعد إعادة تحميل الصفحة
                       </p>
-                      <Button size="sm" onClick={handleSaveSelection}>
+                      <Button size="sm" className="w-full sm:w-auto" onClick={handleSaveSelection}>
                         حفظ التحديد
                       </Button>
                     </div>
@@ -456,7 +458,7 @@ export default function ExcelExtractorPage() {
                         </TableBody>
                       </Table>
                     </div>
-                    <div className="p-3">
+                    <div className="p-2 sm:p-3">
                       <ExportBar
                         headers={visibleHeaders}
                         allRows={selectedRows}
@@ -472,11 +474,11 @@ export default function ExcelExtractorPage() {
 
             <TabsContent value="saved" className="mt-3">
               <div className="border rounded-xl overflow-hidden">
-                <div className="flex items-center justify-between px-4 py-3 border-b bg-muted/20">
-                  <div className="flex items-center gap-2">
+                <div className="flex flex-col sm:flex-row sm:items-center justify-between gap-2 px-3 sm:px-4 py-3 border-b bg-muted/20">
+                  <div className="flex items-center gap-2 min-w-0">
                     <span className="font-semibold text-sm">الصفوف المحفوظة</span>
                     {savedSelection && (
-                      <Badge variant="secondary" className="text-xs">
+                      <Badge variant="secondary" className="text-xs max-w-[180px] truncate">
                         {savedSelection.fileName}
                       </Badge>
                     )}
@@ -485,7 +487,7 @@ export default function ExcelExtractorPage() {
                     <Button
                       variant="ghost"
                       size="sm"
-                      className="text-destructive hover:text-destructive"
+                      className="text-destructive hover:text-destructive w-full sm:w-auto"
                         onClick={async () => {
                           try {
                             await clearSavedSelection()
@@ -506,7 +508,7 @@ export default function ExcelExtractorPage() {
                     <p className="text-sm">لا توجد صفوف محفوظة حتى الآن</p>
                   </div>
                 ) : (
-                  <div className="p-3">
+                  <div className="p-2 sm:p-3">
                     <ExportBar
                       headers={savedHeaders}
                       allRows={savedRows}
@@ -545,11 +547,11 @@ export default function ExcelExtractorPage() {
         </div>
       )}
 
-      <div className="flex justify-end">
+      <div className="fixed bottom-4 right-4 z-30 sm:static sm:z-auto sm:flex sm:justify-end">
         <Button
           variant="outline"
           size="sm"
-          className="gap-2"
+          className="gap-2 shadow-sm bg-background/95 backdrop-blur supports-[backdrop-filter]:bg-background/80"
           onClick={checkDatabaseHealth}
           disabled={dbHealth === "checking"}
         >
