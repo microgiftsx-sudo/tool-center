@@ -4,6 +4,7 @@ import { create } from "zustand"
 import apiClient from "@/lib/axiosClients"
 
 const isRemoteActivitySyncEnabled = process.env.NEXT_PUBLIC_ENABLE_REMOTE_ACTIVITY_SYNC === "true"
+const ACTIVITY_STORAGE_KEY = "tools-hub-activity"
 
 // ── Types ──────────────────────────────────────────────────────────────────────
 
@@ -39,6 +40,24 @@ interface ActivityActions {
 
 type ActivityStore = ActivityState & ActivityActions
 
+function saveEntriesToLocal(entries: ActivityEntry[]) {
+  if (typeof window === "undefined") return
+  localStorage.setItem(ACTIVITY_STORAGE_KEY, JSON.stringify(entries))
+}
+
+function loadEntriesFromLocal(): ActivityEntry[] {
+  if (typeof window === "undefined") return []
+  try {
+    const raw = localStorage.getItem(ACTIVITY_STORAGE_KEY)
+    if (!raw) return []
+    const parsed = JSON.parse(raw) as ActivityEntry[]
+    if (!Array.isArray(parsed)) return []
+    return parsed.slice(0, 20)
+  } catch {
+    return []
+  }
+}
+
 // ── Store ──────────────────────────────────────────────────────────────────────
 
 export const useActivityStore = create<ActivityStore>()((set, get) => ({
@@ -48,13 +67,14 @@ export const useActivityStore = create<ActivityStore>()((set, get) => ({
   // ── Initialize from API ──────────────────────────────────────────────────────
   initialize: async () => {
     if (get().isInitialized) return
-    if (typeof window !== "undefined") {
-      localStorage.removeItem("tools-hub-activity")
-    }
+
+    const localEntries = loadEntriesFromLocal()
+
     if (!isRemoteActivitySyncEnabled) {
-      set({ isInitialized: true })
+      set({ entries: localEntries, isInitialized: true })
       return
     }
+
     try {
       const res = await apiClient.get<{ data: { items: Record<string, unknown>[] } }>("/activity?limit=20")
       const items = (res.data as { data?: { items?: Record<string, unknown>[] } })?.data?.items ?? []
@@ -65,21 +85,27 @@ export const useActivityStore = create<ActivityStore>()((set, get) => ({
         detail: r.detail as string | undefined,
         at: r.createdAt as string,
       }))
+      saveEntriesToLocal(entries)
       set({ entries, isInitialized: true })
     } catch {
-      set({ isInitialized: true })
+      set({ entries: localEntries, isInitialized: true })
     }
   },
 
   // ── Log new activity (optimistic) ────────────────────────────────────────────
   log: (entry) => {
     // Optimistic: add with a temp id of 0
+    const tempId = -Date.now()
     const tempEntry: ActivityEntry = {
       ...entry,
-      id: 0,
+      id: tempId,
       at: new Date().toISOString(),
     }
-    set((s) => ({ entries: [tempEntry, ...s.entries].slice(0, 20) }))
+    set((s) => {
+      const nextEntries = [tempEntry, ...s.entries].slice(0, 20)
+      saveEntriesToLocal(nextEntries)
+      return { entries: nextEntries }
+    })
 
     if (!isRemoteActivitySyncEnabled) return
     // Sync to API
@@ -91,11 +117,13 @@ export const useActivityStore = create<ActivityStore>()((set, get) => ({
       const saved = (res.data as { data?: { id?: number; createdAt?: string } })?.data
       if (saved?.id) {
         // Replace temp entry (id=0) with the real DB id
-        set((s) => ({
-          entries: s.entries.map((e) =>
-            e.id === 0 && e.label === entry.label ? { ...e, id: saved.id!, at: saved.createdAt ?? e.at } : e
-          ),
-        }))
+        set((s) => {
+          const nextEntries = s.entries.map((e) =>
+            e.id === tempId ? { ...e, id: saved.id!, at: saved.createdAt ?? e.at } : e
+          )
+          saveEntriesToLocal(nextEntries)
+          return { entries: nextEntries }
+        })
       }
     }).catch(() => {/* silent */})
   },
@@ -103,15 +131,20 @@ export const useActivityStore = create<ActivityStore>()((set, get) => ({
   // ── Clear all ────────────────────────────────────────────────────────────────
   clear: () => {
     set({ entries: [] })
+    saveEntriesToLocal([])
     if (!isRemoteActivitySyncEnabled) return
     apiClient.delete("/activity").catch(() => {/* silent */})
   },
 
   // ── Remove single entry ──────────────────────────────────────────────────────
   remove: (id) => {
-    set((s) => ({ entries: s.entries.filter((e) => e.id !== id) }))
+    set((s) => {
+      const nextEntries = s.entries.filter((e) => e.id !== id)
+      saveEntriesToLocal(nextEntries)
+      return { entries: nextEntries }
+    })
     if (!isRemoteActivitySyncEnabled) return
-    if (id !== 0) {
+    if (id > 0) {
       apiClient.delete(`/activity/${id}`).catch(() => {/* silent */})
     }
   },
