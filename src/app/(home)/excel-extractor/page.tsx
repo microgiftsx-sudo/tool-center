@@ -2,14 +2,13 @@
 
 import { useState, useMemo, useCallback, useEffect, useRef } from "react"
 import * as XLSX from "xlsx"
-import { CheckCircle2, FileSpreadsheet, Loader2, X, Trash2 } from "lucide-react"
+import { CheckCircle2, FileSpreadsheet, Loader2, RefreshCw, X, Trash2 } from "lucide-react"
 import { Button } from "@/components/ui/button"
 import { Badge } from "@/components/ui/badge"
 import { Tabs, TabsContent, TabsList, TabsTrigger } from "@/components/ui/tabs"
 import {
   Table, TableBody, TableCell, TableHead, TableHeader, TableRow,
 } from "@/components/ui/table"
-import { FileUploadZone } from "@/components/features/excel-extractor/file-upload-zone"
 import { FilterPanel } from "@/components/features/excel-extractor/filter-panel"
 import { ResultsTable } from "@/components/features/excel-extractor/results-table"
 import { ExportBar } from "@/components/features/excel-extractor/export-bar"
@@ -37,6 +36,7 @@ export default function ExcelExtractorPage() {
   const [dbHealth, setDbHealth] = useState<"idle" | "checking" | "ok" | "fail">("idle")
   const [dbLastCheckedAt, setDbLastCheckedAt] = useState<string>("")
   const dbCheckInFlightRef = useRef(false)
+  const fileInputRef = useRef<HTMLInputElement | null>(null)
   useEffect(() => { setMounted(true) }, [])
 
   // ── Persisted store state ────────────────────────────────────────────────────
@@ -210,6 +210,10 @@ export default function ExcelExtractorPage() {
     resetSettings()
   }
 
+  function openAnotherFilePicker() {
+    fileInputRef.current?.click()
+  }
+
   const isProcessing = step !== "idle" && step !== "done"
   const isFilterActive = filterValue.trim().length > 0
   const hasActiveFileView = !!fileName && visibleHeaders.length > 0
@@ -273,8 +277,33 @@ export default function ExcelExtractorPage() {
             {fileName}
           </Button>
         )}
-
       </div>
+
+      {!isProcessing && (
+        <div className="flex justify-start">
+          <Button
+            variant="outline"
+            size="sm"
+            className="gap-2 w-full sm:w-auto"
+            onClick={openAnotherFilePicker}
+          >
+            <RefreshCw className="w-4 h-4" />
+            اختيار ملف آخر
+          </Button>
+        </div>
+      )}
+
+      <input
+        ref={fileInputRef}
+        type="file"
+        accept=".xlsx,.xls"
+        className="hidden"
+        onChange={(e) => {
+          const file = e.target.files?.[0]
+          if (file) handleFile(file)
+          e.currentTarget.value = ""
+        }}
+      />
 
       {/* ── Progress ── */}
       {step !== "idle" && <ProcessingProgress step={step} />}
@@ -286,7 +315,7 @@ export default function ExcelExtractorPage() {
           جاري تحميل إعدادات الملف والعمليات الأخيرة...
         </div>
       )}
-      {mounted && !isProcessing && !fileName && !extractorSyncLoading && recentFiles.length > 0 && (
+      {mounted && !isProcessing && !fileName && !extractorSyncLoading && !settingsRestoredFrom && recentFiles.length > 0 && (
         <RecentFilesSection
           onRestored={() => toast.success("تم استعادة إعدادات الملف السابق")}
         />
@@ -309,9 +338,6 @@ export default function ExcelExtractorPage() {
         </div>
       )}
 
-      {/* ── Upload zone ── */}
-      {!isProcessing && !fileName && <FileUploadZone onFile={handleFile} />}
-
       {/* ── Main content (tabs) ── */}
       {!isProcessing && (hasActiveFileView || savedRows.length > 0 || savedSelectionLoading || !savedSelectionInitialized) && (
         <div className="space-y-4">
@@ -331,7 +357,7 @@ export default function ExcelExtractorPage() {
           )}
 
           {/* Tabs */}
-          <Tabs defaultValue={hasActiveFileView ? "browse" : "saved"}>
+          <Tabs defaultValue={hasActiveFileView ? "browse" : "selected"}>
             <div className="overflow-x-auto -mx-1 px-1 pb-1">
               <TabsList className="w-full min-w-max sm:min-w-0 sm:w-full">
               {hasActiveFileView && (
@@ -346,21 +372,23 @@ export default function ExcelExtractorPage() {
               {hasActiveFileView && (
                 <TabsTrigger value="selected" className="flex-1 min-w-[130px] sm:min-w-0 gap-2 text-xs sm:text-sm">
                   الصفوف المحددة
-                  {selectedKeys.size > 0 && (
+                  {(selectedKeys.size > 0 || savedRows.length > 0) && (
                     <Badge className="text-xs bg-primary/15 text-primary border-primary/30">
-                      {selectedKeys.size}
+                      {selectedKeys.size > 0 ? selectedKeys.size : savedRows.length}
                     </Badge>
                   )}
                 </TabsTrigger>
               )}
-              <TabsTrigger value="saved" className="flex-1 min-w-[130px] sm:min-w-0 gap-2 text-xs sm:text-sm">
-                المحفوظ محليًا
-                {savedRows.length > 0 && (
-                  <Badge variant="secondary" className="text-xs">
-                    {savedRows.length}
-                  </Badge>
-                )}
-              </TabsTrigger>
+              {!hasActiveFileView && (
+                <TabsTrigger value="selected" className="flex-1 min-w-[130px] sm:min-w-0 gap-2 text-xs sm:text-sm">
+                  الصفوف المحددة
+                  {(savedRows.length > 0 || selectedKeys.size > 0) && (
+                    <Badge className="text-xs bg-primary/15 text-primary border-primary/30">
+                      {selectedKeys.size > 0 ? selectedKeys.size : savedRows.length}
+                    </Badge>
+                  )}
+                </TabsTrigger>
+              )}
               </TabsList>
             </div>
 
@@ -390,14 +418,16 @@ export default function ExcelExtractorPage() {
             )}
 
             {/* ── Tab 2: Selected rows + export ── */}
-            {hasActiveFileView && (
+            {(hasActiveFileView || savedRows.length > 0 || !savedSelectionInitialized || savedSelectionLoading) && (
               <TabsContent value="selected" className="mt-3">
               <div className="border rounded-xl overflow-hidden">
                 <div className="flex flex-col sm:flex-row sm:items-center justify-between gap-2 px-3 sm:px-4 py-3 border-b bg-primary/5">
-                  <span className="font-semibold text-sm text-primary">الصفوف المحددة</span>
+                  <span className="font-semibold text-sm text-primary">
+                    {selectedKeys.size > 0 ? "الصفوف المحددة" : savedRows.length > 0 ? "الصفوف المحفوظة" : "الصفوف المحددة"}
+                  </span>
                   <div className="flex items-center gap-2 self-end sm:self-auto">
                     <Badge className="bg-primary/15 text-primary border-primary/30 hover:bg-primary/20">
-                      {selectedKeys.size} صف
+                      {selectedKeys.size > 0 ? selectedKeys.size : savedRows.length} صف
                     </Badge>
                     {selectedKeys.size > 0 && (
                       <Button
@@ -409,29 +439,55 @@ export default function ExcelExtractorPage() {
                         <Trash2 className="w-3.5 h-3.5" />
                       </Button>
                     )}
+                    {selectedKeys.size === 0 && savedRows.length > 0 && (
+                      <Button
+                        variant="ghost"
+                        size="sm"
+                        className="text-destructive hover:text-destructive"
+                        onClick={async () => {
+                          try {
+                            await clearSavedSelection()
+                            toast.success("تم مسح الصفوف المحفوظة من قاعدة البيانات")
+                          } catch {
+                            toast.error("تعذر مسح الصفوف المحفوظة")
+                          }
+                        }}
+                      >
+                        مسح الحفظ
+                      </Button>
+                    )}
                   </div>
                 </div>
 
-                {selectedKeys.size === 0 ? (
+                {(selectedKeys.size === 0 && savedRows.length === 0) ? (
+                  (!savedSelectionInitialized || savedSelectionLoading) ? (
+                    <div className="flex items-center justify-center gap-2 py-16 px-6 text-center text-muted-foreground">
+                      <Loader2 className="w-4 h-4 animate-spin" />
+                      <p className="text-sm">جاري تحميل الصفوف المحفوظة...</p>
+                    </div>
+                  ) : (
                   <div className="flex flex-col items-center justify-center py-16 px-6 text-center text-muted-foreground">
                     <FileSpreadsheet className="w-10 h-10 mb-3 opacity-20" />
                     <p className="text-sm">انتقل إلى تبويب &quot;جميع الصفوف&quot; وحدّد ما تريد</p>
                   </div>
+                  )
                 ) : (
                   <div className="flex flex-col">
-                    <div className="flex flex-col sm:flex-row sm:items-center justify-between gap-2 px-3 sm:px-4 py-2 border-b bg-muted/20">
-                      <p className="text-xs text-muted-foreground leading-relaxed">
-                        احفظ التحديد الحالي ليبقى بعد إعادة تحميل الصفحة
-                      </p>
-                      <Button size="sm" className="w-full sm:w-auto" onClick={handleSaveSelection}>
-                        حفظ التحديد
-                      </Button>
-                    </div>
+                    {selectedKeys.size > 0 && (
+                      <div className="flex flex-col sm:flex-row sm:items-center justify-between gap-2 px-3 sm:px-4 py-2 border-b bg-muted/20">
+                        <p className="text-xs text-muted-foreground leading-relaxed">
+                          احفظ التحديد الحالي ليبقى بعد إعادة تحميل الصفحة
+                        </p>
+                        <Button size="sm" className="w-full sm:w-auto" onClick={handleSaveSelection}>
+                          حفظ التحديد
+                        </Button>
+                      </div>
+                    )}
                     <div className="overflow-auto max-h-[460px] border-b">
                       <Table>
                         <TableHeader>
                           <TableRow className="bg-muted/30 hover:bg-muted/30">
-                            {visibleHeaders.map((h) => (
+                            {(selectedKeys.size > 0 ? visibleHeaders : savedHeaders).map((h) => (
                               <TableHead key={h} className="whitespace-nowrap text-right text-xs font-semibold py-2">
                                 {h}
                               </TableHead>
@@ -440,9 +496,10 @@ export default function ExcelExtractorPage() {
                           </TableRow>
                         </TableHeader>
                         <TableBody>
-                          {selectedRows.map((row, i) => {
-                            const originalKey = [...selectedKeys][i]
-                            const rowColor = visibleHeaders.reduce<string | undefined>((found, h) => {
+                          {(selectedKeys.size > 0 ? selectedRows : savedRows).map((row, i) => {
+                            const originalKey = [...selectedKeys][i] ?? `saved-${i}`
+                            const headersToRender = selectedKeys.size > 0 ? visibleHeaders : savedHeaders
+                            const rowColor = headersToRender.reduce<string | undefined>((found, h) => {
                               if (found) return found
                               return resolveCellColor(colorRules, h, row[h])
                             }, undefined)
@@ -452,7 +509,7 @@ export default function ExcelExtractorPage() {
                                 className="text-xs"
                                 style={rowColor ? { backgroundColor: rowColor + "44" } : undefined}
                               >
-                                {visibleHeaders.map((h) => {
+                                {headersToRender.map((h) => {
                                   const cellColor = resolveCellColor(colorRules, h, row[h])
                                   return (
                                     <TableCell
@@ -468,12 +525,14 @@ export default function ExcelExtractorPage() {
                                   )
                                 })}
                                 <TableCell className="py-2 px-2">
-                                  <button
-                                    onClick={() => toggleRow(originalKey)}
-                                    className="text-muted-foreground hover:text-destructive transition-colors"
-                                  >
-                                    <X className="w-3.5 h-3.5" />
-                                  </button>
+                                  {selectedKeys.size > 0 && (
+                                    <button
+                                      onClick={() => toggleRow(Number(originalKey))}
+                                      className="text-muted-foreground hover:text-destructive transition-colors"
+                                    >
+                                      <X className="w-3.5 h-3.5" />
+                                    </button>
+                                  )}
                                 </TableCell>
                               </TableRow>
                             )
@@ -483,10 +542,10 @@ export default function ExcelExtractorPage() {
                     </div>
                     <div className="p-2 sm:p-3">
                       <ExportBar
-                        headers={visibleHeaders}
-                        allRows={selectedRows}
+                        headers={selectedKeys.size > 0 ? visibleHeaders : savedHeaders}
+                        allRows={selectedKeys.size > 0 ? selectedRows : savedRows}
                         selectedRows={[]}
-                        fileName={fileName}
+                        fileName={selectedKeys.size > 0 ? fileName : `${savedSelection?.fileName ?? "saved"}_saved`}
                       />
                     </div>
                   </div>
@@ -494,85 +553,6 @@ export default function ExcelExtractorPage() {
               </div>
               </TabsContent>
             )}
-
-            <TabsContent value="saved" className="mt-3">
-              <div className="border rounded-xl overflow-hidden">
-                <div className="flex flex-col sm:flex-row sm:items-center justify-between gap-2 px-3 sm:px-4 py-3 border-b bg-muted/20">
-                  <div className="flex items-center gap-2 min-w-0">
-                    <span className="font-semibold text-sm">الصفوف المحفوظة</span>
-                    {savedSelection && (
-                      <Badge variant="secondary" className="text-xs max-w-[180px] truncate">
-                        {savedSelection.fileName}
-                      </Badge>
-                    )}
-                  </div>
-                  {savedRows.length > 0 && (
-                    <Button
-                      variant="ghost"
-                      size="sm"
-                      className="text-destructive hover:text-destructive w-full sm:w-auto"
-                        onClick={async () => {
-                          try {
-                            await clearSavedSelection()
-                            toast.success("تم مسح الصفوف المحفوظة من قاعدة البيانات")
-                          } catch {
-                            toast.error("تعذر مسح الصفوف المحفوظة")
-                          }
-                        }}
-                    >
-                      مسح الحفظ
-                    </Button>
-                  )}
-                </div>
-
-                {savedRows.length === 0 || savedHeaders.length === 0 ? (
-                  (!savedSelectionInitialized || savedSelectionLoading) ? (
-                    <div className="flex items-center justify-center gap-2 py-16 px-6 text-center text-muted-foreground">
-                      <Loader2 className="w-4 h-4 animate-spin" />
-                      <p className="text-sm">جاري تحميل الصفوف المحفوظة...</p>
-                    </div>
-                  ) : (
-                  <div className="flex flex-col items-center justify-center py-16 px-6 text-center text-muted-foreground">
-                    <FileSpreadsheet className="w-10 h-10 mb-3 opacity-20" />
-                    <p className="text-sm">لا توجد صفوف محفوظة حتى الآن</p>
-                  </div>
-                  )
-                ) : (
-                  <div className="p-2 sm:p-3">
-                    <ExportBar
-                      headers={savedHeaders}
-                      allRows={savedRows}
-                      selectedRows={[]}
-                      fileName={`${savedSelection?.fileName ?? "saved"}_saved`}
-                    />
-                    <div className="overflow-auto max-h-[460px] border rounded-lg mt-3">
-                      <Table>
-                        <TableHeader>
-                          <TableRow className="bg-muted/30 hover:bg-muted/30">
-                            {savedHeaders.map((h) => (
-                              <TableHead key={h} className="whitespace-nowrap text-right text-xs font-semibold py-2">
-                                {h}
-                              </TableHead>
-                            ))}
-                          </TableRow>
-                        </TableHeader>
-                        <TableBody>
-                          {savedRows.map((row, i) => (
-                            <TableRow key={i} className="text-xs">
-                              {savedHeaders.map((h) => (
-                                <TableCell key={`${h}-${i}`} className="whitespace-nowrap text-right py-2">
-                                  {String(row[h] ?? "")}
-                                </TableCell>
-                              ))}
-                            </TableRow>
-                          ))}
-                        </TableBody>
-                      </Table>
-                    </div>
-                  </div>
-                )}
-              </div>
-            </TabsContent>
           </Tabs>
         </div>
       )}
@@ -582,7 +562,7 @@ export default function ExcelExtractorPage() {
           variant="outline"
           size="sm"
           className="gap-2 shadow-sm bg-background/95 backdrop-blur supports-[backdrop-filter]:bg-background/80"
-          onClick={checkDatabaseHealth}
+          onClick={() => { checkDatabaseHealth(true) }}
           disabled={dbHealth === "checking"}
         >
           <span
