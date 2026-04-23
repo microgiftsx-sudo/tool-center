@@ -32,15 +32,12 @@ export interface RegisterUserData {
   fullName: string
   userName: string
   role: string
+  password: string
 }
 
 export interface RegisterResponse {
-  id: number
-  fullName: string
-  userName: string
-  role: string
-  isTempPass: boolean
-  defaultPassword: string
+  access_token: string
+  user: User
 }
 
 // Change password types

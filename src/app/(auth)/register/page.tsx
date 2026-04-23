@@ -11,24 +11,35 @@ import { Input } from "@/components/ui/input";
 import { Label } from "@/components/ui/label";
 import { Card, CardContent, CardDescription, CardHeader, CardTitle } from "@/components/ui/card";
 import { useAuth } from "@/hooks/useAuth";
-import type { RegisterUserData } from "@/store/auth/authTypes";
+import { useAuthStore } from "@/store/auth/authStore";
+import type { RegisterUserData, RegisterResponse } from "@/store/auth/authTypes";
 
 const registerSchema = z.object({
   fullName: z.string().min(2, "الاسم الكامل يجب أن يكون حرفين على الأقل"),
   userName: z.string().min(3, "اسم المستخدم يجب أن يكون 3 أحرف على الأقل"),
   role: z.string().min(1, "الدور مطلوب"),
+  password: z.string().min(6, "كلمة المرور يجب أن تكون 6 أحرف على الأقل"),
+  confirmPassword: z.string().min(1, "تأكيد كلمة المرور مطلوب"),
+}).refine((data) => data.password === data.confirmPassword, {
+  message: "كلمتا المرور غير متطابقتين",
+  path: ["confirmPassword"],
 });
 
-const defaultForm: RegisterUserData = {
+type RegisterFormData = RegisterUserData & { confirmPassword: string };
+
+const defaultForm: RegisterFormData = {
   fullName: "",
   userName: "",
   role: "",
+  password: "",
+  confirmPassword: "",
 };
 
 export default function RegisterPage() {
   const router = useRouter();
   const { register, loading } = useAuth();
-  const [formData, setFormData] = useState<RegisterUserData>(defaultForm);
+  const setAuth = useAuthStore((s) => s.setAuth);
+  const [formData, setFormData] = useState<RegisterFormData>(defaultForm);
   const [errors, setErrors] = useState<Record<string, string>>({});
 
   function resolveApiError(error: unknown): { message: string; field?: string } {
@@ -41,7 +52,7 @@ export default function RegisterPage() {
     return { message: "فشل إنشاء الحساب، تحقق من البيانات ثم حاول مرة أخرى" };
   }
 
-  const handleChange = (field: keyof RegisterUserData) => (
+  const handleChange = (field: keyof RegisterFormData) => (
     e: React.ChangeEvent<HTMLInputElement>
   ) => {
     setFormData((prev) => ({ ...prev, [field]: e.target.value }));
@@ -66,12 +77,24 @@ export default function RegisterPage() {
 
     try {
       await register({
-        data: validation.data,
-        onSuccess: () => {
-          toast.success("تم إنشاء الحساب بنجاح");
+        data: {
+          fullName: validation.data.fullName,
+          userName: validation.data.userName,
+          role: validation.data.role,
+          password: validation.data.password,
+        },
+        onSuccess: (response) => {
+          const responseData = (response as { data?: RegisterResponse })?.data;
+          if (!responseData?.access_token || !responseData.user) {
+            toast.error("تم إنشاء الحساب لكن تعذر تسجيل الدخول التلقائي");
+            router.push("/login");
+            return;
+          }
+          setAuth(responseData.user, responseData.access_token);
+          toast.success("تم إنشاء الحساب وتسجيل الدخول بنجاح");
           setFormData(defaultForm);
           setErrors({});
-          router.push("/login");
+          router.push("/");
         },
         onError: (error) => {
           const resolved = resolveApiError(error);
@@ -133,6 +156,32 @@ export default function RegisterPage() {
                 className={errors.role ? "border-red-500" : ""}
               />
               {errors.role && <p className="text-sm text-red-600 dark:text-red-400">{errors.role}</p>}
+            </div>
+
+            <div className="space-y-2">
+              <Label htmlFor="password">كلمة المرور</Label>
+              <Input
+                id="password"
+                type="password"
+                value={formData.password}
+                onChange={handleChange("password")}
+                placeholder="أدخل كلمة مرور قوية"
+                className={errors.password ? "border-red-500" : ""}
+              />
+              {errors.password && <p className="text-sm text-red-600 dark:text-red-400">{errors.password}</p>}
+            </div>
+
+            <div className="space-y-2">
+              <Label htmlFor="confirmPassword">تأكيد كلمة المرور</Label>
+              <Input
+                id="confirmPassword"
+                type="password"
+                value={formData.confirmPassword}
+                onChange={handleChange("confirmPassword")}
+                placeholder="أعد إدخال كلمة المرور"
+                className={errors.confirmPassword ? "border-red-500" : ""}
+              />
+              {errors.confirmPassword && <p className="text-sm text-red-600 dark:text-red-400">{errors.confirmPassword}</p>}
             </div>
 
             <Button type="submit" className="w-full" disabled={loading.register}>

@@ -7,14 +7,15 @@ export const dynamic = "force-dynamic"
 
 export async function POST(request: Request) {
   try {
-    const body = (await request.json()) as { fullName?: string; userName?: string; role?: string }
+    const body = (await request.json()) as { fullName?: string; userName?: string; role?: string; password?: string }
     const fullName = String(body.fullName ?? "").trim()
     const userName = String(body.userName ?? "").trim()
     const role = String(body.role ?? "").trim()
+    const password = String(body.password ?? "")
 
-    if (!fullName || !userName || !role) {
+    if (!fullName || !userName || !role || !password) {
       return NextResponse.json(
-        { message: "الاسم واسم المستخدم والدور مطلوبة", code: "MISSING_FIELDS" },
+        { message: "الاسم واسم المستخدم والدور وكلمة المرور مطلوبة", code: "MISSING_FIELDS" },
         { status: 400 }
       )
     }
@@ -33,26 +34,41 @@ export async function POST(request: Request) {
       )
     }
 
-    const defaultPassword = randomUUID().slice(0, 8)
+    if (password.length < 6) {
+      return NextResponse.json(
+        { message: "كلمة المرور يجب أن تكون 6 أحرف على الأقل", code: "INVALID_PASSWORD", field: "password" },
+        { status: 400 }
+      )
+    }
+
     const pool = getDbPool()
 
     const result = await pool.query(
       `INSERT INTO app_users (full_name, user_name, role, password_hash, is_temp_pass)
-       VALUES ($1, $2, $3, crypt($4, gen_salt('bf')), true)
+       VALUES ($1, $2, $3, crypt($4, gen_salt('bf')), false)
        RETURNING id, full_name, user_name, role, is_temp_pass`,
-      [fullName, userName, role, defaultPassword]
+      [fullName, userName, role, password]
     )
 
     const row = result.rows[0]
+    const accessToken = randomUUID()
+    await pool.query(
+      `INSERT INTO auth_sessions (token, user_id, expires_at)
+       VALUES ($1, $2, NOW() + interval '1 day')`,
+      [accessToken, row.id]
+    )
+
     return NextResponse.json({
       status: "success",
       data: {
-        id: row.id as number,
-        fullName: row.full_name as string,
-        userName: row.user_name as string,
-        role: row.role as string,
-        isTempPass: row.is_temp_pass as boolean,
-        defaultPassword,
+        access_token: accessToken,
+        user: {
+          id: row.id as number,
+          fullName: row.full_name as string,
+          userName: row.user_name as string,
+          role: row.role as string,
+          isTempPass: row.is_temp_pass as boolean,
+        },
       },
     })
   } catch (error) {
