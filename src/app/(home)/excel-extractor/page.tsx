@@ -2,7 +2,7 @@
 
 import { useState, useMemo, useCallback, useEffect } from "react"
 import * as XLSX from "xlsx"
-import { CheckCircle2, FileSpreadsheet, X, Trash2 } from "lucide-react"
+import { CheckCircle2, FileSpreadsheet, Loader2, X, Trash2 } from "lucide-react"
 import { Button } from "@/components/ui/button"
 import { Badge } from "@/components/ui/badge"
 import { Tabs, TabsContent, TabsList, TabsTrigger } from "@/components/ui/tabs"
@@ -34,6 +34,7 @@ export default function ExcelExtractorPage() {
   const [colorModalCol, setColorModalCol] = useState<string | null>(null)
   const [colorModalKey, setColorModalKey] = useState(0)
   const [mounted, setMounted] = useState(false)
+  const [dbHealth, setDbHealth] = useState<"idle" | "checking" | "ok" | "fail">("idle")
   useEffect(() => { setMounted(true) }, [])
 
   // ── Persisted store state ────────────────────────────────────────────────────
@@ -209,6 +210,24 @@ export default function ExcelExtractorPage() {
   const isFilterActive = filterValue.trim().length > 0
   const hasActiveFileView = !!fileName && visibleHeaders.length > 0
 
+  async function checkDatabaseHealth() {
+    setDbHealth("checking")
+    try {
+      const res = await fetch("/api/db-health", { method: "GET", cache: "no-store" })
+      const data = (await res.json()) as { ok?: boolean; message?: string }
+      if (data.ok) {
+        setDbHealth("ok")
+        toast.success("اتصال قاعدة البيانات يعمل")
+      } else {
+        setDbHealth("fail")
+        toast.error(data.message || "قاعدة البيانات غير متصلة")
+      }
+    } catch {
+      setDbHealth("fail")
+      toast.error("فشل فحص قاعدة البيانات")
+    }
+  }
+
   return (
     <div className="space-y-5 w-full">
 
@@ -237,6 +256,7 @@ export default function ExcelExtractorPage() {
             {fileName}
           </Button>
         )}
+
       </div>
 
       {/* ── Progress ── */}
@@ -524,6 +544,28 @@ export default function ExcelExtractorPage() {
           </Tabs>
         </div>
       )}
+
+      <div className="flex justify-end">
+        <Button
+          variant="outline"
+          size="sm"
+          className="gap-2"
+          onClick={checkDatabaseHealth}
+          disabled={dbHealth === "checking"}
+        >
+          <span
+            className={`w-2.5 h-2.5 rounded-full ${
+              dbHealth === "ok"
+                ? "bg-emerald-500"
+                : dbHealth === "fail"
+                  ? "bg-red-500"
+                  : "bg-muted-foreground/40"
+            }`}
+          />
+          {dbHealth === "checking" && <Loader2 className="w-3.5 h-3.5 animate-spin" />}
+          حالة DB
+        </Button>
+      </div>
 
       {/* ── Color Rule Modal — key forces full remount every open so useState initializers always re-run with latest existingRule ── */}
       {colorModalCol && (
