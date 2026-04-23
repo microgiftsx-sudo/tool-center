@@ -13,28 +13,16 @@ type SelectionPayload = {
   savedAt: string
 }
 
-const MOCK_SELECTION: SelectionPayload = {
-  fileName: "mock-extract",
-  headers: ["الاسم", "المدينة", "الرقم"],
-  rows: [
-    { الاسم: "أحمد", المدينة: "الرياض", الرقم: 1001 },
-    { الاسم: "سارة", المدينة: "جدة", الرقم: 1002 },
-    { الاسم: "علي", المدينة: "الدمام", الرقم: 1003 },
-  ],
-  savedAt: new Date().toISOString(),
-}
-
-function mockModeEnabled() {
-  return process.env.USE_MOCK_EXTRACTED_SELECTION === "true"
-}
-
 function databaseConfigured() {
   return Boolean(process.env.DATABASE_URL)
 }
 
 export async function GET() {
-  if (mockModeEnabled()) {
-    return NextResponse.json({ data: MOCK_SELECTION })
+  if (!databaseConfigured()) {
+    return NextResponse.json(
+      { message: "DATABASE_URL is missing", data: null },
+      { status: 500 }
+    )
   }
 
   try {
@@ -46,7 +34,7 @@ export async function GET() {
     )
 
     if (result.rowCount === 0) {
-      return NextResponse.json({ data: MOCK_SELECTION })
+      return NextResponse.json({ data: null })
     }
 
     const row = result.rows[0]
@@ -59,11 +47,10 @@ export async function GET() {
       },
     })
   } catch (error) {
-    // Dev-safe fallback: if DB is unavailable, still return mock data
-    return NextResponse.json({
-      data: MOCK_SELECTION,
-      meta: { fallback: "mock", reason: String(error) },
-    })
+    return NextResponse.json(
+      { message: "Failed to load saved selection", error: String(error) },
+      { status: 500 }
+    )
   }
 }
 
@@ -80,7 +67,7 @@ export async function PUT(request: Request) {
     }
 
     if (!databaseConfigured()) {
-      return NextResponse.json({ ok: true, meta: { fallback: "no-database" } })
+      return NextResponse.json({ message: "DATABASE_URL is missing" }, { status: 500 })
     }
 
     await ensureExtractedSelectionsTable()
@@ -109,7 +96,7 @@ export async function PUT(request: Request) {
 export async function DELETE() {
   try {
     if (!databaseConfigured()) {
-      return NextResponse.json({ ok: true, meta: { fallback: "no-database" } })
+      return NextResponse.json({ message: "DATABASE_URL is missing" }, { status: 500 })
     }
 
     await ensureExtractedSelectionsTable()
@@ -117,6 +104,9 @@ export async function DELETE() {
     await pool.query("DELETE FROM extracted_selections WHERE id = $1", [RECORD_ID])
     return NextResponse.json({ ok: true })
   } catch (error) {
-    return NextResponse.json({ ok: true, meta: { fallback: "mock", reason: String(error) } })
+    return NextResponse.json(
+      { message: "Failed to clear saved selection", error: String(error) },
+      { status: 500 }
+    )
   }
 }
