@@ -2,7 +2,7 @@
 
 import Link from "next/link"
 import { usePathname, useRouter } from "next/navigation"
-import { LayoutGrid, LogOut } from "lucide-react"
+import { LayoutGrid, LogOut, ShieldCheck } from "lucide-react"
 import { cn } from "@/lib/utils"
 import { Button } from "@/components/ui/button"
 import { useAuthStore } from "@/store/auth/authStore"
@@ -52,6 +52,20 @@ export default function TopNav() {
             <LayoutGrid className="w-4 h-4 shrink-0" />
             <span className="hidden sm:inline">الرئيسية</span>
           </Link>
+          {user?.role === "admin" && (
+            <Link
+              href="/admin-dashboard"
+              className={cn(
+                "flex items-center gap-2 px-3.5 py-2 rounded-lg text-sm font-medium transition-all duration-150",
+                pathname === "/admin-dashboard"
+                  ? "bg-primary text-primary-foreground shadow-md shadow-primary/30"
+                  : "text-muted-foreground hover:text-primary hover:bg-primary/10"
+              )}
+            >
+              <ShieldCheck className="w-4 h-4 shrink-0" />
+              <span className="hidden sm:inline">لوحة الأدمن</span>
+            </Link>
+          )}
 
           {user && (
             <Button

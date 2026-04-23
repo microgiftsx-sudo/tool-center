@@ -1,11 +1,17 @@
 import { NextResponse } from "next/server"
 import { getDbPool } from "@/lib/db"
+import { getSessionUserFromRequest } from "@/lib/auth-server"
 
 export const runtime = "nodejs"
 export const dynamic = "force-dynamic"
 
-export async function GET() {
+export async function GET(request: Request) {
   try {
+    const user = await getSessionUserFromRequest(request)
+    if (!user || user.role !== "admin") {
+      return NextResponse.json({ message: "غير مصرح" }, { status: 403 })
+    }
+
     const pool = getDbPool()
     const result = await pool.query(
       `SELECT id, user_name, full_name, role, is_temp_pass, created_at, updated_at

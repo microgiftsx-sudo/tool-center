@@ -32,6 +32,36 @@ CREATE INDEX IF NOT EXISTS idx_auth_sessions_user_id ON auth_sessions(user_id);
 CREATE INDEX IF NOT EXISTS idx_auth_sessions_expires_at ON auth_sessions(expires_at);
 
 -- =========================================
+-- Account requests (developer onboarding)
+-- =========================================
+CREATE TABLE IF NOT EXISTS account_requests (
+  id BIGSERIAL PRIMARY KEY,
+  full_name TEXT NOT NULL,
+  email TEXT NOT NULL,
+  requested_role TEXT NOT NULL DEFAULT 'user',
+  notes TEXT,
+  status TEXT NOT NULL DEFAULT 'pending' CHECK (status IN ('pending', 'approved', 'rejected')),
+  reviewed_by BIGINT REFERENCES app_users(id) ON DELETE SET NULL,
+  reviewed_at TIMESTAMPTZ,
+  decision_note TEXT,
+  created_at TIMESTAMPTZ NOT NULL DEFAULT NOW()
+);
+
+CREATE INDEX IF NOT EXISTS idx_account_requests_status_created
+  ON account_requests (status, created_at DESC);
+CREATE INDEX IF NOT EXISTS idx_account_requests_email
+  ON account_requests (lower(email));
+
+-- =========================================
+-- System settings
+-- =========================================
+CREATE TABLE IF NOT EXISTS app_settings (
+  key TEXT PRIMARY KEY,
+  value TEXT NOT NULL,
+  updated_at TIMESTAMPTZ NOT NULL DEFAULT NOW()
+);
+
+-- =========================================
 -- Excel Extracted Selections
 -- =========================================
 CREATE TABLE IF NOT EXISTS extracted_selections (
@@ -54,5 +84,9 @@ CREATE INDEX IF NOT EXISTS idx_extracted_selections_updated_at
 INSERT INTO app_users (user_name, full_name, role, password_hash, is_temp_pass)
 VALUES ('admin', 'System Admin', 'admin', crypt('Admin@123', gen_salt('bf')), true)
 ON CONFLICT (user_name) DO NOTHING;
+
+INSERT INTO app_settings (key, value)
+VALUES ('maintenance_mode', 'false')
+ON CONFLICT (key) DO NOTHING;
 
 COMMIT;
