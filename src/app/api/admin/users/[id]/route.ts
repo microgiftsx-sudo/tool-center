@@ -27,12 +27,14 @@ export async function PATCH(request: Request, context: RouteContext) {
       userName?: string
       role?: string
       isTempPass?: boolean
+      password?: string
     }
 
     const fullName = String(body.fullName ?? "").trim()
     const userName = String(body.userName ?? "").trim().toLowerCase()
     const role = String(body.role ?? "").trim()
     const isTempPass = Boolean(body.isTempPass)
+    const password = String(body.password ?? "").trim()
 
     if (!fullName || !userName || !role) {
       return NextResponse.json(
@@ -40,19 +42,38 @@ export async function PATCH(request: Request, context: RouteContext) {
         { status: 400 }
       )
     }
+    if (password && password.length < 6) {
+      return NextResponse.json(
+        { message: "كلمة المرور الجديدة يجب أن تكون 6 أحرف على الأقل" },
+        { status: 400 }
+      )
+    }
 
     const pool = getDbPool()
-    const updated = await pool.query(
-      `UPDATE app_users
-       SET full_name = $1,
-           user_name = $2,
-           role = $3,
-           is_temp_pass = $4,
-           updated_at = NOW()
-       WHERE id = $5
-       RETURNING id, user_name, full_name, role, is_temp_pass, created_at, updated_at`,
-      [fullName, userName, role, isTempPass, userId]
-    )
+    const updated = password
+      ? await pool.query(
+          `UPDATE app_users
+           SET full_name = $1,
+               user_name = $2,
+               role = $3,
+               is_temp_pass = $4,
+               password_hash = crypt($5, gen_salt('bf')),
+               updated_at = NOW()
+           WHERE id = $6
+           RETURNING id, user_name, full_name, role, is_temp_pass, created_at, updated_at`,
+          [fullName, userName, role, isTempPass, password, userId]
+        )
+      : await pool.query(
+          `UPDATE app_users
+           SET full_name = $1,
+               user_name = $2,
+               role = $3,
+               is_temp_pass = $4,
+               updated_at = NOW()
+           WHERE id = $5
+           RETURNING id, user_name, full_name, role, is_temp_pass, created_at, updated_at`,
+          [fullName, userName, role, isTempPass, userId]
+        )
 
     if ((updated.rowCount ?? 0) === 0) {
       return NextResponse.json({ message: "المستخدم غير موجود" }, { status: 404 })

@@ -1,9 +1,9 @@
 "use client"
 
-import { Input } from "@/components/ui/input"
 import { Label } from "@/components/ui/label"
 import { Checkbox } from "@/components/ui/checkbox"
 import { Button } from "@/components/ui/button"
+import { Textarea } from "@/components/ui/textarea"
 import { X } from "lucide-react"
 import {
   Select,
@@ -17,9 +17,11 @@ interface FilterPanelProps {
   headers: string[]
   filterColumn: string
   filterValue: string
+  searchMode: "startsWith" | "includes" | "exact"
   selectedColumns: string[]
   onColumnChange: (col: string) => void
   onValueChange: (val: string) => void
+  onSearchModeChange: (mode: "startsWith" | "includes" | "exact") => void
   onToggleColumn: (col: string) => void
   onClearFilter: () => void
 }
@@ -28,9 +30,11 @@ export function FilterPanel({
   headers,
   filterColumn,
   filterValue,
+  searchMode,
   selectedColumns,
   onColumnChange,
   onValueChange,
+  onSearchModeChange,
   onToggleColumn,
   onClearFilter,
 }: FilterPanelProps) {
@@ -57,13 +61,30 @@ export function FilterPanel({
         </div>
 
         <div className="space-y-1.5">
-          <Label>قيمة البحث</Label>
+          <Label>طريقة البحث</Label>
+          <Select
+            value={searchMode}
+            onValueChange={(v) => onSearchModeChange(v as "startsWith" | "includes" | "exact")}
+          >
+            <SelectTrigger>
+              <SelectValue />
+            </SelectTrigger>
+            <SelectContent>
+              <SelectItem value="startsWith">يبدأ بـ</SelectItem>
+              <SelectItem value="includes">يحتوي على</SelectItem>
+              <SelectItem value="exact">مطابق تمامًا</SelectItem>
+            </SelectContent>
+          </Select>
+        </div>
+
+        <div className="space-y-1.5">
+          <Label>قيم البحث (متعدد)</Label>
           <div className="flex gap-2">
-            <Input
-              placeholder="اكتب للبحث..."
+            <Textarea
+              placeholder={"مثال:\nاحمد\nمحمد, خالد"}
               value={filterValue}
               onChange={(e) => onValueChange(e.target.value)}
-              className="text-sm"
+              className="text-sm min-h-[92px] resize-y"
             />
             {filterValue && (
               <Button variant="ghost" size="icon" onClick={onClearFilter} className="shrink-0">
@@ -71,6 +92,9 @@ export function FilterPanel({
               </Button>
             )}
           </div>
+          <p className="text-xs text-muted-foreground">
+            أدخل أكثر من قيمة (كل سطر أو فاصلة). سيتم عرض الصف إذا طابق أي قيمة.
+          </p>
         </div>
       </div>
 

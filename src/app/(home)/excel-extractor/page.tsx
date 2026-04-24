@@ -2,10 +2,17 @@
 
 import { useState, useMemo, useCallback, useEffect, useRef } from "react"
 import * as XLSX from "xlsx"
-import { CheckCircle2, FileSpreadsheet, Loader2, RefreshCw, X, Trash2 } from "lucide-react"
+import { FileSpreadsheet, Loader2, RefreshCw, X, Trash2 } from "lucide-react"
 import { Button } from "@/components/ui/button"
 import { Badge } from "@/components/ui/badge"
 import { Tabs, TabsContent, TabsList, TabsTrigger } from "@/components/ui/tabs"
+import {
+  Dialog,
+  DialogContent,
+  DialogDescription,
+  DialogHeader,
+  DialogTitle,
+} from "@/components/ui/dialog"
 import {
   Table, TableBody, TableCell, TableHead, TableHeader, TableRow,
 } from "@/components/ui/table"
@@ -13,7 +20,6 @@ import { FilterPanel } from "@/components/features/excel-extractor/filter-panel"
 import { ResultsTable } from "@/components/features/excel-extractor/results-table"
 import { ExportBar } from "@/components/features/excel-extractor/export-bar"
 import { ProcessingProgress, ProcessingStep } from "@/components/features/excel-extractor/processing-progress"
-import { RecentFilesSection } from "@/components/features/excel-extractor/recent-files-section"
 import {
   ColorRuleModal, ColorRule, resolveCellColor,
 } from "@/components/features/excel-extractor/color-rule-modal"
@@ -30,14 +36,17 @@ export default function ExcelExtractorPage() {
   const [headers, setHeaders]     = useState<string[]>([])
   const [allRows, setAllRows]     = useState<Record<string, unknown>[]>([])
   const [selectedKeys, setSelectedKeys] = useState<Set<number>>(new Set())
+  const [searchMode, setSearchMode] = useState<"startsWith" | "includes" | "exact">("startsWith")
   const [colorModalCol, setColorModalCol] = useState<string | null>(null)
   const [colorModalKey, setColorModalKey] = useState(0)
-  const [mounted, setMounted] = useState(false)
+  const [detailsOpen, setDetailsOpen] = useState(false)
+  const [detailsTitle, setDetailsTitle] = useState("")
+  const [detailsHeaders, setDetailsHeaders] = useState<string[]>([])
+  const [detailsRow, setDetailsRow] = useState<Record<string, unknown> | null>(null)
   const [dbHealth, setDbHealth] = useState<"idle" | "checking" | "ok" | "fail">("idle")
   const [dbLastCheckedAt, setDbLastCheckedAt] = useState<string>("")
   const dbCheckInFlightRef = useRef(false)
   const fileInputRef = useRef<HTMLInputElement | null>(null)
-  useEffect(() => { setMounted(true) }, [])
 
   // ── Persisted store state ────────────────────────────────────────────────────
   const {
@@ -45,11 +54,7 @@ export default function ExcelExtractorPage() {
     filterValue, setFilterValue,
     selectedColumns, setSelectedColumns, toggleColumn,
     colorRules, updateColorRule,
-    addRecentFile,
-    recentFiles,
-    settingsRestoredFrom, clearRestoredHint,
     resetSettings,
-    isLoading: extractorSyncLoading,
   } = useExcelExtractorStore()
 
   const logActivity = useActivityStore((s) => s.log)
@@ -95,16 +100,6 @@ export default function ExcelExtractorPage() {
 
             const baseName = file.name.replace(/\.[^.]+$/, "")
             setFileName(baseName)
-            clearRestoredHint()
-
-            addRecentFile({
-              fileName: baseName,
-              uploadedAt: new Date().toISOString(),
-              rowCount: rows.length,
-              headers: hdrs,
-              colorRules: storedRules,
-              selectedColumns: matching.length > 0 ? matching : hdrs,
-            })
 
             setStep("done")
             logActivity({
@@ -124,14 +119,25 @@ export default function ExcelExtractorPage() {
 
   // ── Filter ───────────────────────────────────────────────────────────────────
   const filteredIndices = useMemo(() => {
-    if (!filterValue.trim()) return allRows.map((_, i) => i)
-    const val = filterValue.trim().toLowerCase()
+    const searchTerms = filterValue
+      .split(/[\n,،]/)
+      .map((v) => v.trim().toLowerCase())
+      .filter(Boolean)
+    if (searchTerms.length === 0) return allRows.map((_, i) => i)
     return allRows.reduce<number[]>((acc, row, i) => {
       const cols = filterColumn ? [filterColumn] : headers
-      if (cols.some((c) => String(row[c] ?? "").toLowerCase().includes(val))) acc.push(i)
+      const hasMatch = cols.some((c) => {
+        const cellValue = String(row[c] ?? "").toLowerCase()
+        return searchTerms.some((term) => {
+          if (searchMode === "exact") return cellValue === term
+          if (searchMode === "includes") return cellValue.includes(term)
+          return cellValue.startsWith(term)
+        })
+      })
+      if (hasMatch) acc.push(i)
       return acc
     }, [])
-  }, [allRows, filterColumn, filterValue, headers])
+  }, [allRows, filterColumn, filterValue, headers, searchMode])
 
   const filteredRows   = useMemo(() => filteredIndices.map((i) => allRows[i]), [filteredIndices, allRows])
   const visibleHeaders = useMemo(() => headers.filter((h) => selectedColumns.includes(h)), [headers, selectedColumns])
@@ -212,6 +218,17 @@ export default function ExcelExtractorPage() {
 
   function openAnotherFilePicker() {
     fileInputRef.current?.click()
+  }
+
+  function openRowDetails(
+    row: Record<string, unknown>,
+    headersForDetails: string[],
+    title: string
+  ) {
+    setDetailsRow(row)
+    setDetailsHeaders(headersForDetails)
+    setDetailsTitle(title)
+    setDetailsOpen(true)
   }
 
   const isProcessing = step !== "idle" && step !== "done"
@@ -308,36 +325,6 @@ export default function ExcelExtractorPage() {
       {/* ── Progress ── */}
       {step !== "idle" && <ProcessingProgress step={step} />}
 
-      {/* ── Recent files (shown only when no file loaded, after client hydration) ── */}
-      {mounted && !isProcessing && !fileName && extractorSyncLoading && (
-        <div className="flex items-center justify-center gap-2 text-sm text-muted-foreground border rounded-xl px-4 py-6">
-          <Loader2 className="w-4 h-4 animate-spin" />
-          جاري تحميل إعدادات الملف والعمليات الأخيرة...
-        </div>
-      )}
-      {mounted && !isProcessing && !fileName && !extractorSyncLoading && !settingsRestoredFrom && recentFiles.length > 0 && (
-        <RecentFilesSection
-          onRestored={() => toast.success("تم استعادة إعدادات الملف السابق")}
-        />
-      )}
-
-      {/* ── Pre-load banner (shown after restore, before re-upload) ── */}
-      {!isProcessing && !fileName && settingsRestoredFrom && (
-        <div className="flex items-center gap-2 px-4 py-2.5 rounded-lg border border-emerald-200 bg-emerald-50 dark:bg-emerald-950/20 dark:border-emerald-800 text-sm text-emerald-700 dark:text-emerald-400">
-          <CheckCircle2 className="w-4 h-4 shrink-0" />
-          <span>
-            تم تحميل إعدادات <strong>{settingsRestoredFrom}</strong> — أعد رفع الملف لتطبيقها
-          </span>
-          <button
-            onClick={clearRestoredHint}
-            className="mr-auto text-emerald-500 hover:text-emerald-700 dark:hover:text-emerald-300 transition-colors"
-            aria-label="إغلاق"
-          >
-            <X className="w-3.5 h-3.5" />
-          </button>
-        </div>
-      )}
-
       {/* ── Main content (tabs) ── */}
       {!isProcessing && (hasActiveFileView || savedRows.length > 0 || savedSelectionLoading || !savedSelectionInitialized) && (
         <div className="space-y-4">
@@ -348,9 +335,11 @@ export default function ExcelExtractorPage() {
               headers={headers}
               filterColumn={filterColumn}
               filterValue={filterValue}
+              searchMode={searchMode}
               selectedColumns={selectedColumns}
               onColumnChange={setFilterColumn}
               onValueChange={setFilterValue}
+              onSearchModeChange={setSearchMode}
               onToggleColumn={toggleColumn}
               onClearFilter={() => setFilterValue("")}
             />
@@ -492,6 +481,9 @@ export default function ExcelExtractorPage() {
                                 {h}
                               </TableHead>
                             ))}
+                            <TableHead className="w-20 text-right text-xs font-semibold py-2">
+                              التفاصيل
+                            </TableHead>
                             <TableHead className="w-8" />
                           </TableRow>
                         </TableHeader>
@@ -524,6 +516,30 @@ export default function ExcelExtractorPage() {
                                     </TableCell>
                                   )
                                 })}
+                                <TableCell className="py-2 px-2">
+                                  <Button
+                                    variant="ghost"
+                                    size="sm"
+                                    onClick={() => {
+                                      const isSelectedView = selectedKeys.size > 0
+                                      if (isSelectedView && typeof originalKey === "number") {
+                                        openRowDetails(
+                                          allRows[originalKey] ?? row,
+                                          headers,
+                                          `تفاصيل الصف ${originalKey + 2}`
+                                        )
+                                        return
+                                      }
+                                      openRowDetails(
+                                        row,
+                                        savedHeaders,
+                                        `تفاصيل صف محفوظ #${i + 1}`
+                                      )
+                                    }}
+                                  >
+                                    عرض
+                                  </Button>
+                                </TableCell>
                                 <TableCell className="py-2 px-2">
                                   {selectedKeys.size > 0 && (
                                     <button
@@ -596,6 +612,35 @@ export default function ExcelExtractorPage() {
           onSave={handleColorSave}
         />
       )}
+
+      <Dialog open={detailsOpen} onOpenChange={setDetailsOpen}>
+        <DialogContent className="max-w-2xl">
+          <DialogHeader>
+            <DialogTitle>{detailsTitle || "تفاصيل الصف"}</DialogTitle>
+            <DialogDescription>
+              عرض جميع القيم المتاحة لهذا الصف.
+            </DialogDescription>
+          </DialogHeader>
+          <div className="max-h-[60vh] overflow-auto border rounded-lg">
+            <Table>
+              <TableHeader>
+                <TableRow>
+                  <TableHead className="w-[220px]">الحقل</TableHead>
+                  <TableHead>القيمة</TableHead>
+                </TableRow>
+              </TableHeader>
+              <TableBody>
+                {(detailsHeaders.length > 0 ? detailsHeaders : Object.keys(detailsRow ?? {})).map((h) => (
+                  <TableRow key={h}>
+                    <TableCell className="font-medium">{h}</TableCell>
+                    <TableCell>{String(detailsRow?.[h] ?? "")}</TableCell>
+                  </TableRow>
+                ))}
+              </TableBody>
+            </Table>
+          </div>
+        </DialogContent>
+      </Dialog>
     </div>
   )
 }

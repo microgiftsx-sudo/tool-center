@@ -35,6 +35,7 @@ type UserEditForm = {
   userName: string
   role: string
   isTempPass: boolean
+  password: string
 }
 
 export default function AdminDashboardPage() {
@@ -55,6 +56,7 @@ export default function AdminDashboardPage() {
     userName: "",
     role: "user",
     isTempPass: false,
+    password: "",
   })
   const [createForm, setCreateForm] = useState({
     fullName: "",
@@ -194,6 +196,7 @@ export default function AdminDashboardPage() {
       userName: account.userName,
       role: account.role,
       isTempPass: account.isTempPass,
+      password: "",
     })
   }
 
@@ -205,9 +208,17 @@ export default function AdminDashboardPage() {
   async function saveUserEdit(userId: number) {
     setSavingUserId(userId)
     try {
+      const payload = userEditForm.password
+        ? userEditForm
+        : {
+            fullName: userEditForm.fullName,
+            userName: userEditForm.userName,
+            role: userEditForm.role,
+            isTempPass: userEditForm.isTempPass,
+          }
       await authedFetch(`/api/admin/users/${userId}`, {
         method: "PATCH",
-        body: JSON.stringify(userEditForm),
+        body: JSON.stringify(payload),
       })
       toast.success("تم تحديث تفاصيل الحساب")
       setEditingUserId(null)
@@ -457,6 +468,15 @@ export default function AdminDashboardPage() {
                             />
                             كلمة المرور مؤقتة
                           </label>
+                          <div className="space-y-1">
+                            <Label className="text-xs">كلمة مرور جديدة (اختياري)</Label>
+                            <Input
+                              type="password"
+                              value={userEditForm.password}
+                              onChange={(e) => setUserEditForm((p) => ({ ...p, password: e.target.value }))}
+                              placeholder="اتركه فارغًا بدون تغيير"
+                            />
+                          </div>
                         </div>
                       ) : (
                         <div className="space-y-1 mt-2">
