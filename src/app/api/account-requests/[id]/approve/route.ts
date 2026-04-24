@@ -14,6 +14,9 @@ export async function POST(request: Request, context: { params: Promise<{ id: st
     if (!hasPermission(user, "account_requests:review")) {
       return NextResponse.json({ message: "غير مصرح" }, { status: 403 })
     }
+    if (!user) {
+      return NextResponse.json({ message: "غير مصرح" }, { status: 403 })
+    }
 
     const { id } = await context.params
     const requestId = Number(id)
