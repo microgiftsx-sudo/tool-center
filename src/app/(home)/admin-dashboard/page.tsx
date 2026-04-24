@@ -1,7 +1,7 @@
 "use client"
 
 import { useEffect, useState } from "react"
-import { ShieldCheck, Loader2, CheckCircle2, XCircle, UserPlus, Wrench, Pencil, Save } from "lucide-react"
+import { ShieldCheck, Loader2, CheckCircle2, XCircle, UserPlus, Wrench, Pencil, Save, History } from "lucide-react"
 import { toast } from "sonner"
 import { useAuthStore } from "@/store/auth/authStore"
 import { Button } from "@/components/ui/button"
@@ -10,6 +10,7 @@ import { Input } from "@/components/ui/input"
 import { Label } from "@/components/ui/label"
 import { tokenManager } from "@/lib/tokenManager"
 import { Textarea } from "@/components/ui/textarea"
+import { hasPermission } from "@/lib/permissions"
 
 type AccountRequest = {
   id: number
@@ -38,17 +39,31 @@ type UserEditForm = {
   password: string
 }
 
+type AuditLogEntry = {
+  id: number
+  actorUserName: string
+  actorRole: string
+  action: string
+  targetType: string
+  targetId: string
+  createdAt: string
+}
+
 export default function AdminDashboardPage() {
   const user = useAuthStore((s) => s.user)
   const [loading, setLoading] = useState(true)
   const [requests, setRequests] = useState<AccountRequest[]>([])
   const [processingId, setProcessingId] = useState<number | null>(null)
-  const [activeSection, setActiveSection] = useState<"requests" | "create" | "users" | "maintenance">("requests")
+  const [activeSection, setActiveSection] = useState<"requests" | "create" | "users" | "maintenance" | "audit">("requests")
   const [maintenanceLoading, setMaintenanceLoading] = useState(true)
   const [maintenanceEnabled, setMaintenanceEnabled] = useState(false)
   const [maintenanceSource, setMaintenanceSource] = useState<"db" | "env">("db")
   const [usersLoading, setUsersLoading] = useState(true)
   const [users, setUsers] = useState<AppUser[]>([])
+  const [auditLoading, setAuditLoading] = useState(true)
+  const [auditLogs, setAuditLogs] = useState<AuditLogEntry[]>([])
+  const [auditQuery, setAuditQuery] = useState("")
+  const [auditActionFilter, setAuditActionFilter] = useState("")
   const [editingUserId, setEditingUserId] = useState<number | null>(null)
   const [savingUserId, setSavingUserId] = useState<number | null>(null)
   const [userEditForm, setUserEditForm] = useState<UserEditForm>({
@@ -118,6 +133,24 @@ export default function AdminDashboardPage() {
     }
   }
 
+  async function loadAuditLogs() {
+    setAuditLoading(true)
+    try {
+      const params = new URLSearchParams()
+      if (auditQuery.trim()) params.set("q", auditQuery.trim())
+      if (auditActionFilter.trim()) params.set("action", auditActionFilter.trim())
+      params.set("limit", "120")
+      const query = params.toString()
+      const res = await authedFetch(`/api/admin/audit-logs${query ? `?${query}` : ""}`)
+      const data = (res as { data?: AuditLogEntry[] })?.data ?? []
+      setAuditLogs(data)
+    } catch {
+      toast.error("تعذر تحميل سجل التدقيق")
+    } finally {
+      setAuditLoading(false)
+    }
+  }
+
   async function toggleMaintenance(nextState: boolean) {
     try {
       await authedFetch("/api/admin/system/maintenance", {
@@ -133,11 +166,24 @@ export default function AdminDashboardPage() {
     }
   }
 
+  const canReviewRequests = hasPermission(user, "account_requests:review")
+  const canReadUsers = hasPermission(user, "users:read")
+  const canManageUsers = hasPermission(user, "users:manage")
+  const canReadMaintenance = hasPermission(user, "maintenance:read")
+  const canReadAudit = hasPermission(user, "audit_logs:read")
+
   useEffect(() => {
-    loadRequests()
-    loadMaintenance()
-    loadUsers()
-  }, [])
+    if (canReviewRequests) loadRequests()
+    if (canReadMaintenance) loadMaintenance()
+    if (canReadUsers) loadUsers()
+    if (canReadAudit) loadAuditLogs()
+  }, [canReadUsers, canReviewRequests, canReadMaintenance, canReadAudit])
+
+  useEffect(() => {
+    if (activeSection === "audit" && canReadAudit) {
+      loadAuditLogs()
+    }
+  }, [auditQuery, auditActionFilter, activeSection, canReadAudit])
 
   async function approveRequest(id: number) {
     setProcessingId(id)
@@ -231,13 +277,27 @@ export default function AdminDashboardPage() {
     }
   }
 
-  if (!user || user.role !== "admin") {
+  const availableSections = [
+    canReviewRequests ? "requests" : null,
+    canManageUsers ? "create" : null,
+    canReadUsers ? "users" : null,
+    canReadMaintenance ? "maintenance" : null,
+    canReadAudit ? "audit" : null,
+  ].filter(Boolean) as Array<"requests" | "create" | "users" | "maintenance" | "audit">
+
+  useEffect(() => {
+    if (availableSections.length > 0 && !availableSections.includes(activeSection)) {
+      setActiveSection(availableSections[0])
+    }
+  }, [activeSection, availableSections])
+
+  if (!user || availableSections.length === 0) {
     return (
       <div className="max-w-3xl mx-auto py-10">
         <Card>
           <CardHeader>
             <CardTitle>غير مصرح</CardTitle>
-            <CardDescription>هذه الصفحة مخصصة للمشرف فقط.</CardDescription>
+            <CardDescription>لا تملك صلاحية الوصول إلى لوحة الأدمن.</CardDescription>
           </CardHeader>
         </Card>
       </div>
@@ -255,18 +315,78 @@ export default function AdminDashboardPage() {
             <p className="font-semibold text-sm">أقسام الأدمن</p>
           </div>
           <div className="space-y-1">
-            <Button variant={activeSection === "requests" ? "default" : "ghost"} className="w-full justify-center sm:justify-start" onClick={() => setActiveSection("requests")}>
-              طلبات الحساب
-            </Button>
-            <Button variant={activeSection === "create" ? "default" : "ghost"} className="w-full justify-center sm:justify-start" onClick={() => setActiveSection("create")}>
-              تسجيل الحسابات
-            </Button>
-            <Button variant={activeSection === "users" ? "default" : "ghost"} className="w-full justify-center sm:justify-start" onClick={() => setActiveSection("users")}>
-              الحسابات الحالية
-            </Button>
-            <Button variant={activeSection === "maintenance" ? "default" : "ghost"} className="w-full justify-center sm:justify-start" onClick={() => setActiveSection("maintenance")}>
-              وضع الصيانة
-            </Button>
+            <ul className="space-y-1 text-sm">
+              {canReviewRequests && (
+                <li>
+                  <button
+                    className={`w-full rounded-lg px-3 py-2 text-right transition-colors ${
+                      activeSection === "requests"
+                        ? "bg-primary text-primary-foreground"
+                        : "hover:bg-muted text-foreground"
+                    }`}
+                    onClick={() => setActiveSection("requests")}
+                  >
+                    • طلبات الحساب
+                  </button>
+                </li>
+              )}
+              {canManageUsers && (
+                <li>
+                  <button
+                    className={`w-full rounded-lg px-3 py-2 text-right transition-colors ${
+                      activeSection === "create"
+                        ? "bg-primary text-primary-foreground"
+                        : "hover:bg-muted text-foreground"
+                    }`}
+                    onClick={() => setActiveSection("create")}
+                  >
+                    • تسجيل الحسابات
+                  </button>
+                </li>
+              )}
+              {canReadUsers && (
+                <li>
+                  <button
+                    className={`w-full rounded-lg px-3 py-2 text-right transition-colors ${
+                      activeSection === "users"
+                        ? "bg-primary text-primary-foreground"
+                        : "hover:bg-muted text-foreground"
+                    }`}
+                    onClick={() => setActiveSection("users")}
+                  >
+                    • الحسابات الحالية
+                  </button>
+                </li>
+              )}
+              {canReadMaintenance && (
+                <li>
+                  <button
+                    className={`w-full rounded-lg px-3 py-2 text-right transition-colors ${
+                      activeSection === "maintenance"
+                        ? "bg-primary text-primary-foreground"
+                        : "hover:bg-muted text-foreground"
+                    }`}
+                    onClick={() => setActiveSection("maintenance")}
+                  >
+                    • وضع الصيانة
+                  </button>
+                </li>
+              )}
+              {canReadAudit && (
+                <li>
+                  <button
+                    className={`w-full rounded-lg px-3 py-2 text-right transition-colors ${
+                      activeSection === "audit"
+                        ? "bg-primary text-primary-foreground"
+                        : "hover:bg-muted text-foreground"
+                    }`}
+                    onClick={() => setActiveSection("audit")}
+                  >
+                    • سجل التدقيق
+                  </button>
+                </li>
+              )}
+            </ul>
           </div>
         </aside>
 
@@ -281,7 +401,7 @@ export default function AdminDashboardPage() {
             </div>
           </div>
 
-          {activeSection === "create" && (
+          {activeSection === "create" && canManageUsers && (
             <Card>
               <CardHeader>
                 <CardTitle className="text-base">تسجيل الحسابات</CardTitle>
@@ -316,7 +436,7 @@ export default function AdminDashboardPage() {
             </Card>
           )}
 
-          {activeSection === "requests" && (
+          {activeSection === "requests" && canReviewRequests && (
             <Card>
               <CardHeader>
                 <CardTitle className="text-base">طلبات الحساب من المطورين ({pending.length})</CardTitle>
@@ -368,7 +488,7 @@ export default function AdminDashboardPage() {
             </Card>
           )}
 
-          {activeSection === "maintenance" && (
+          {activeSection === "maintenance" && canReadMaintenance && (
             <Card>
               <CardHeader>
                 <CardTitle className="text-base flex items-center gap-2">
@@ -413,7 +533,7 @@ export default function AdminDashboardPage() {
             </Card>
           )}
 
-          {activeSection === "users" && (
+          {activeSection === "users" && canReadUsers && (
             <Card>
               <CardHeader>
                 <CardTitle className="text-base">الحسابات الحالية ({users.length})</CardTitle>
@@ -512,6 +632,52 @@ export default function AdminDashboardPage() {
                           </Button>
                         )}
                       </div>
+                    </div>
+                  ))
+                )}
+              </CardContent>
+            </Card>
+          )}
+
+          {activeSection === "audit" && canReadAudit && (
+            <Card>
+              <CardHeader>
+                <CardTitle className="text-base flex items-center gap-2">
+                  <History className="w-4 h-4 text-primary" />
+                  سجل التدقيق ({auditLogs.length})
+                </CardTitle>
+                <CardDescription>تتبع أحدث الإجراءات الحساسة في المنصة</CardDescription>
+              </CardHeader>
+              <CardContent className="space-y-3">
+                <div className="grid grid-cols-1 md:grid-cols-3 gap-2">
+                  <Input
+                    value={auditQuery}
+                    onChange={(e) => setAuditQuery(e.target.value)}
+                    placeholder="بحث بالمستخدم/الإجراء/الهدف"
+                    className="md:col-span-2"
+                  />
+                  <Input
+                    value={auditActionFilter}
+                    onChange={(e) => setAuditActionFilter(e.target.value)}
+                    placeholder="فلتر action (اختياري)"
+                  />
+                </div>
+                {auditLoading ? (
+                  <div className="flex items-center gap-2 text-muted-foreground text-sm">
+                    <Loader2 className="w-4 h-4 animate-spin" />
+                    جاري تحميل السجل...
+                  </div>
+                ) : auditLogs.length === 0 ? (
+                  <p className="text-sm text-muted-foreground">لا توجد سجلات مطابقة.</p>
+                ) : (
+                  auditLogs.map((log) => (
+                    <div key={log.id} className="border rounded-xl p-3 space-y-1.5">
+                      <div className="flex flex-col sm:flex-row sm:items-center sm:justify-between gap-1">
+                        <p className="font-medium text-sm">{log.action}</p>
+                        <span className="text-xs text-muted-foreground">{new Date(log.createdAt).toLocaleString("ar-SA")}</span>
+                      </div>
+                      <p className="text-sm"><strong>المنفذ:</strong> {log.actorUserName || "غير معروف"} {log.actorRole ? `(${log.actorRole})` : ""}</p>
+                      <p className="text-sm"><strong>الهدف:</strong> {log.targetType || "-"} {log.targetId ? `#${log.targetId}` : ""}</p>
                     </div>
                   ))
                 )}

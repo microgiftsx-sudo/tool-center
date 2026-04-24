@@ -102,13 +102,13 @@ export default function PortalPage() {
   useActivitySync()
 
   return (
-    <div className="flex flex-col gap-6 py-8 w-full max-w-6xl mx-auto">
+    <div className="flex flex-col gap-4 sm:gap-6 py-4 sm:py-8 w-full max-w-6xl mx-auto">
 
       {/* ── Two-panel layout: activity RIGHT, tools LEFT (RTL: first child = right) ── */}
-      <div className="grid grid-cols-1 lg:grid-cols-2 gap-6 items-start w-full">
+      <div className="grid grid-cols-1 lg:grid-cols-2 gap-4 sm:gap-6 items-start w-full">
 
         {/* ── RIGHT panel (first in RTL): Recent activity ── */}
-        <div className="space-y-4 lg:sticky lg:top-20">
+        <div className="space-y-3 sm:space-y-4 lg:sticky lg:top-20">
           <div className="flex items-center justify-between">
             <div className="flex items-center gap-2">
               <Clock className="w-4 h-4 text-muted-foreground" />
@@ -142,7 +142,7 @@ export default function PortalPage() {
               <p className="text-xs mt-1 opacity-70">ستظهر هنا بعد استخدام أي أداة</p>
             </div>
           ) : (
-            <div className="space-y-2 max-h-[600px] overflow-y-auto">
+            <div className="space-y-2 max-h-[60dvh] lg:max-h-[600px] overflow-y-auto">
               {entries.map((entry) => {
                 const meta = TOOL_META[entry.tool]
                 const Icon = meta.icon
@@ -196,19 +196,19 @@ export default function PortalPage() {
         </div>
 
         {/* ── LEFT panel (second in RTL): Tool icons ── */}
-        <div className="space-y-4">
+        <div className="space-y-3 sm:space-y-4">
           <h2 className="text-sm font-semibold text-muted-foreground">الأدوات المتاحة</h2>
-          <div className="grid grid-cols-2 sm:grid-cols-4 gap-3">
+          <div className="grid grid-cols-2 sm:grid-cols-4 gap-2.5 sm:gap-3">
             {tools.map((tool) => {
               const Icon = tool.icon
               return (
                 <Link
                   key={tool.href}
                   href={tool.href}
-                  className={`group flex flex-col items-center gap-2.5 p-4 rounded-2xl border-2 border-transparent hover:border-current/10 transition-all duration-200 hover:shadow-lg ${tool.shadow} cursor-pointer select-none`}
+                  className={`group flex flex-col items-center gap-2 p-3 sm:p-4 rounded-2xl border-2 border-transparent hover:border-current/10 transition-all duration-200 hover:shadow-lg ${tool.shadow} cursor-pointer select-none`}
                 >
-                  <div className={`w-16 h-16 rounded-2xl flex items-center justify-center shadow-sm ${tool.bg} transition-transform duration-200 group-hover:scale-105`}>
-                    <Icon className={`w-8 h-8 ${tool.color}`} />
+                  <div className={`w-14 h-14 sm:w-16 sm:h-16 rounded-2xl flex items-center justify-center shadow-sm ${tool.bg} transition-transform duration-200 group-hover:scale-105`}>
+                    <Icon className={`w-7 h-7 sm:w-8 sm:h-8 ${tool.color}`} />
                   </div>
                   <span className="text-xs font-medium text-center leading-tight text-foreground">
                     {tool.title}

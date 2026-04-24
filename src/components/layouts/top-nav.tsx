@@ -28,53 +28,53 @@ export default function TopNav() {
 
   return (
     <header className="sticky top-0 z-40 border-b border-primary/15 bg-background/95 backdrop-blur supports-[backdrop-filter]:bg-background/80 shadow-sm">
-      <div className="w-full px-6 md:px-10 h-16 flex items-center justify-between">
+      <div className="w-full px-3 sm:px-4 lg:px-10 h-14 sm:h-16 flex items-center justify-between gap-2">
 
         {/* Brand */}
-        <Link href="/" className="flex items-center gap-2.5 shrink-0">
-          <div className="w-8 h-8 rounded-lg bg-primary flex items-center justify-center text-primary-foreground text-sm font-extrabold shadow">
+        <Link href="/" className="flex items-center gap-2 shrink-0 min-w-0">
+          <div className="w-8 h-8 rounded-lg bg-primary flex items-center justify-center text-primary-foreground text-sm font-extrabold shadow shrink-0">
             أ
           </div>
-          <span className="font-bold text-base tracking-tight text-foreground">مركز الأدوات</span>
+          <span className="font-bold text-lg sm:text-base tracking-tight text-foreground truncate">مركز الأدوات</span>
         </Link>
 
         {/* Navigation + auth actions */}
-        <nav className="flex items-center gap-2">
+        <nav className="flex items-center gap-1.5 sm:gap-2 shrink-0">
           <Link
             href="/"
             className={cn(
-              "flex items-center gap-2 px-3.5 py-2 rounded-lg text-sm font-medium transition-all duration-150",
+              "flex items-center gap-2 px-2.5 sm:px-3.5 py-2 rounded-lg text-sm font-medium transition-all duration-150",
               pathname === "/"
                 ? "bg-primary text-primary-foreground shadow-md shadow-primary/30"
                 : "text-muted-foreground hover:text-primary hover:bg-primary/10"
             )}
           >
             <LayoutGrid className="w-4 h-4 shrink-0" />
-            <span className="hidden sm:inline">الرئيسية</span>
+            <span className="hidden lg:inline">الرئيسية</span>
           </Link>
           {user?.role === "admin" && (
             <Link
               href="/admin-dashboard"
               className={cn(
-                "flex items-center gap-2 px-3.5 py-2 rounded-lg text-sm font-medium transition-all duration-150",
+                "flex items-center gap-2 px-2.5 sm:px-3.5 py-2 rounded-lg text-sm font-medium transition-all duration-150",
                 pathname === "/admin-dashboard"
                   ? "bg-primary text-primary-foreground shadow-md shadow-primary/30"
                   : "text-muted-foreground hover:text-primary hover:bg-primary/10"
               )}
             >
               <ShieldCheck className="w-4 h-4 shrink-0" />
-              <span className="hidden sm:inline">لوحة الأدمن</span>
+              <span className="hidden lg:inline">لوحة الأدمن</span>
             </Link>
           )}
 
           <Button
             variant="outline"
             size="sm"
-            className="gap-2 text-destructive border-destructive/30 hover:bg-destructive/10 hover:text-destructive"
+            className="gap-1.5 px-2.5 sm:px-3 text-destructive border-destructive/30 hover:bg-destructive/10 hover:text-destructive"
             onClick={handleLogout}
           >
             <LogOut className="w-4 h-4" />
-            <span>خروج</span>
+            <span className="hidden sm:inline">خروج</span>
           </Button>
         </nav>
 

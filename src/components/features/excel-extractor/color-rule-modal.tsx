@@ -184,13 +184,15 @@ export function ColorRuleModal({
 
   return (
     <Dialog open={open} onOpenChange={(v) => !v && onClose()}>
-      <DialogContent className="max-w-lg max-h-[85vh] overflow-y-auto" dir="rtl">
+      <DialogContent className="max-w-xl h-[88dvh] sm:h-auto sm:max-h-[85vh] overflow-hidden" dir="rtl">
         <DialogHeader>
           <DialogTitle className="flex items-center gap-2">
             <Palette className="w-5 h-5 text-primary" />
             تلوين عمود: <span className="text-primary">{column}</span>
           </DialogTitle>
         </DialogHeader>
+
+        <div className="flex-1 overflow-y-auto pr-0.5">
 
         {/* Mode toggle */}
         <div className="flex gap-2 border rounded-lg p-1 bg-muted/30">
@@ -233,7 +235,7 @@ export function ColorRuleModal({
               </div>
             </div>
 
-            <div className="space-y-1.5 max-h-[300px] overflow-y-auto">
+            <div className="space-y-1.5 max-h-[34dvh] sm:max-h-[300px] overflow-y-auto">
               {uniqueValues.map((val) => {
                 const color = valueMap[val] ?? "#e5e7eb"
                 const isNone = color === NO_COLOR
@@ -357,17 +359,18 @@ export function ColorRuleModal({
             </Button>
           </div>
         )}
+        </div>
 
         {/* Actions */}
-        <div className="flex gap-2 pt-1 border-t">
-          <Button onClick={handleSave} className="flex-1">حفظ التلوين</Button>
+        <div className="sticky bottom-0 bg-zinc-50 dark:bg-zinc-900 border-t pt-2 flex flex-wrap sm:flex-nowrap gap-2">
+          <Button onClick={handleSave} className="flex-1 min-w-[140px]">حفظ التلوين</Button>
           {existingRule && (
-            <Button variant="outline" onClick={() => onSave(null)} className="gap-1.5 text-destructive border-destructive/30 hover:bg-destructive/5">
+            <Button variant="outline" onClick={() => onSave(null)} className="gap-1.5 text-destructive border-destructive/30 hover:bg-destructive/5 min-w-[96px]">
               <X className="w-4 h-4" />
               إزالة
             </Button>
           )}
-          <Button variant="ghost" onClick={onClose}>إلغاء</Button>
+          <Button variant="ghost" onClick={onClose} className="min-w-[80px]">إلغاء</Button>
         </div>
       </DialogContent>
     </Dialog>
