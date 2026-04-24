@@ -79,32 +79,31 @@ export function FilterPanel({
 
       {/* Column visibility */}
       <div className="space-y-2">
-        <div className="flex items-center justify-between">
-          <Label>الأعمدة المعروضة</Label>
-          <div className="flex gap-2 text-xs text-muted-foreground">
+        <div className="flex flex-col gap-2 sm:flex-row sm:items-center sm:justify-between">
+          <Label className="text-sm">الأعمدة المعروضة</Label>
+          <div className="flex items-center gap-2 text-xs text-muted-foreground">
             <button
               onClick={() => headers.forEach((h) => !selectedColumns.includes(h) && onToggleColumn(h))}
-              className="hover:text-foreground transition-colors"
+              className="px-2 py-1 rounded-md border hover:text-foreground hover:border-foreground/30 transition-colors"
             >
               تحديد الكل
             </button>
-            <span>·</span>
             <button
               onClick={() => headers.forEach((h) => selectedColumns.includes(h) && onToggleColumn(h))}
-              className="hover:text-foreground transition-colors"
+              className="px-2 py-1 rounded-md border hover:text-foreground hover:border-foreground/30 transition-colors"
             >
               إلغاء الكل
             </button>
           </div>
         </div>
-        <div className="flex flex-wrap gap-x-3 gap-y-2 pt-1 max-h-36 overflow-auto pr-1">
+        <div className="grid grid-cols-2 sm:flex sm:flex-wrap gap-x-3 gap-y-2 pt-1 max-h-44 overflow-auto pr-1">
           {headers.map((h) => (
-            <label key={h} className="flex items-center gap-2 cursor-pointer select-none">
+            <label key={h} className="flex items-center gap-2 cursor-pointer select-none min-w-0">
               <Checkbox
                 checked={selectedColumns.includes(h)}
                 onCheckedChange={() => onToggleColumn(h)}
               />
-              <span className="text-sm">{h}</span>
+              <span className="text-sm truncate">{h}</span>
             </label>
           ))}
         </div>
