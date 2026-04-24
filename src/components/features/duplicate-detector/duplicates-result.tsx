@@ -1,7 +1,7 @@
 "use client"
 
-import { useState } from "react"
-import { Copy, ChevronDown, ChevronUp } from "lucide-react"
+import { useEffect, useRef, useState } from "react"
+import { Copy, ChevronDown, ChevronUp, Check } from "lucide-react"
 import { Button } from "@/components/ui/button"
 import { Badge } from "@/components/ui/badge"
 import { Card, CardContent } from "@/components/ui/card"
@@ -29,6 +29,8 @@ export function DuplicatesResult({
   scannedColumn,
 }: DuplicatesResultProps) {
   const [expanded, setExpanded] = useState<Set<string>>(new Set())
+  const [copied, setCopied] = useState(false)
+  const copiedTimerRef = useRef<ReturnType<typeof setTimeout> | null>(null)
   const uniqueCount = totalRows - results.reduce((acc, r) => acc + r.count - 1, 0)
 
   function toggleExpand(value: string) {
@@ -47,15 +49,27 @@ export function DuplicatesResult({
       )
       try {
         await copyTableToClipboard(headers, dupRows)
+        setCopied(true)
+        if (copiedTimerRef.current) clearTimeout(copiedTimerRef.current)
+        copiedTimerRef.current = setTimeout(() => setCopied(false), 1800)
         toast.success(`تم نسخ ${dupRows.length} صف مكرر`)
       } catch { toast.error("تعذّر النسخ") }
     } else {
       // Text-only mode (text tab)
       const text = results.map((r) => `${r.value} (${r.count} مرات)`).join("\n")
       await navigator.clipboard.writeText(text)
+      setCopied(true)
+      if (copiedTimerRef.current) clearTimeout(copiedTimerRef.current)
+      copiedTimerRef.current = setTimeout(() => setCopied(false), 1800)
       toast.success("تم النسخ")
     }
   }
+
+  useEffect(() => {
+    return () => {
+      if (copiedTimerRef.current) clearTimeout(copiedTimerRef.current)
+    }
+  }, [])
 
   return (
     <div className="space-y-4">
@@ -96,9 +110,14 @@ export function DuplicatesResult({
                 <span className="text-muted-foreground font-normal"> — عمود: {scannedColumn}</span>
               )}
             </p>
-            <Button variant="outline" size="sm" onClick={copyDuplicates} className="gap-1.5">
-              <Copy className="w-3.5 h-3.5" />
-              نسخ الكل
+            <Button
+              variant="outline"
+              size="sm"
+              onClick={copyDuplicates}
+              className={`gap-1.5 transition-all ${copied ? "bg-emerald-50 border-emerald-300 text-emerald-700" : ""}`}
+            >
+              {copied ? <Check className="w-3.5 h-3.5" /> : <Copy className="w-3.5 h-3.5" />}
+              {copied ? "تم النسخ" : "نسخ الكل"}
             </Button>
           </div>
 

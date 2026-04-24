@@ -1,6 +1,7 @@
 "use client"
 
-import { Download, Copy, Printer } from "lucide-react"
+import { useEffect, useRef, useState } from "react"
+import { Download, Copy, Printer, Check } from "lucide-react"
 import { Button } from "@/components/ui/button"
 import { Badge } from "@/components/ui/badge"
 import { toast } from "sonner"
@@ -15,6 +16,8 @@ interface ExportBarProps {
 }
 
 export function ExportBar({ headers, allRows, selectedRows, fileName }: ExportBarProps) {
+  const [copied, setCopied] = useState(false)
+  const copiedTimerRef = useRef<ReturnType<typeof setTimeout> | null>(null)
   const exportTarget = selectedRows.length > 0 ? selectedRows : allRows
   const label = selectedRows.length > 0
     ? `تصدير المحدد (${selectedRows.length})`
@@ -99,6 +102,9 @@ export function ExportBar({ headers, allRows, selectedRows, fileName }: ExportBa
     }
     try {
       await copyTableToClipboard(headers, exportTarget)
+      setCopied(true)
+      if (copiedTimerRef.current) clearTimeout(copiedTimerRef.current)
+      copiedTimerRef.current = setTimeout(() => setCopied(false), 1800)
       toast.success(`تم نسخ ${exportTarget.length} صف — الصقها في Excel أو Word`)
     } catch {
       try {
@@ -123,6 +129,12 @@ export function ExportBar({ headers, allRows, selectedRows, fileName }: ExportBa
       }
     }
   }
+
+  useEffect(() => {
+    return () => {
+      if (copiedTimerRef.current) clearTimeout(copiedTimerRef.current)
+    }
+  }, [])
 
   function printTable() {
     if (!hasData) {
@@ -173,9 +185,14 @@ export function ExportBar({ headers, allRows, selectedRows, fileName }: ExportBa
         <Download className="w-4 h-4" />
         {label}
       </Button>
-      <Button variant="outline" onClick={copyToClipboard} className="gap-2 border-primary/30 hover:bg-primary/10 hover:text-primary flex-1 sm:flex-none" disabled={!hasData}>
-        <Copy className="w-4 h-4" />
-        نسخ
+      <Button
+        variant="outline"
+        onClick={copyToClipboard}
+        className={`gap-2 border-primary/30 hover:bg-primary/10 hover:text-primary flex-1 sm:flex-none transition-all ${copied ? "bg-emerald-50 border-emerald-300 text-emerald-700" : ""}`}
+        disabled={!hasData}
+      >
+        {copied ? <Check className="w-4 h-4" /> : <Copy className="w-4 h-4" />}
+        {copied ? "تم النسخ" : "نسخ"}
       </Button>
       <Button variant="outline" onClick={printTable} className="gap-2 border-primary/30 hover:bg-primary/10 hover:text-primary flex-1 sm:flex-none" disabled={!hasData}>
         <Printer className="w-4 h-4" />
