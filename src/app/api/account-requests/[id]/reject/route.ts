@@ -1,6 +1,8 @@
 import { NextResponse } from "next/server"
 import { getDbPool } from "@/lib/db"
 import { getSessionUserFromRequest } from "@/lib/auth-server"
+import { hasPermission } from "@/lib/permissions"
+import { writeAuditLog } from "@/lib/audit-log"
 
 export const runtime = "nodejs"
 export const dynamic = "force-dynamic"
@@ -8,7 +10,10 @@ export const dynamic = "force-dynamic"
 export async function POST(request: Request, context: { params: Promise<{ id: string }> }) {
   try {
     const user = await getSessionUserFromRequest(request)
-    if (!user || user.role !== "admin") {
+    if (!hasPermission(user, "account_requests:review")) {
+      return NextResponse.json({ message: "غير مصرح" }, { status: 403 })
+    }
+    if (!user) {
       return NextResponse.json({ message: "غير مصرح" }, { status: 403 })
     }
 
@@ -37,6 +42,14 @@ export async function POST(request: Request, context: { params: Promise<{ id: st
     if (result.rowCount === 0) {
       return NextResponse.json({ message: "الطلب غير موجود أو تمت معالجته سابقًا" }, { status: 404 })
     }
+
+    await writeAuditLog({
+      actor: user,
+      action: "account_requests.reject",
+      targetType: "account_request",
+      targetId: String(requestId),
+      details: { reason },
+    })
 
     return NextResponse.json({ status: "success", message: "تم رفض الطلب" })
   } catch (error) {

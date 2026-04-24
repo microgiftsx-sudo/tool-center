@@ -1,6 +1,8 @@
 import { NextResponse } from "next/server"
 import { getDbPool } from "@/lib/db"
 import { getSessionUserFromRequest } from "@/lib/auth-server"
+import { hasPermission } from "@/lib/permissions"
+import { writeAuditLog } from "@/lib/audit-log"
 
 export const runtime = "nodejs"
 export const dynamic = "force-dynamic"
@@ -12,7 +14,7 @@ function envMaintenanceEnabled() {
 export async function GET(request: Request) {
   try {
     const user = await getSessionUserFromRequest(request)
-    if (!user || user.role !== "admin") {
+    if (!hasPermission(user, "maintenance:read")) {
       return NextResponse.json({ message: "غير مصرح" }, { status: 403 })
     }
 
@@ -43,7 +45,7 @@ export async function GET(request: Request) {
 export async function PUT(request: Request) {
   try {
     const user = await getSessionUserFromRequest(request)
-    if (!user || user.role !== "admin") {
+    if (!hasPermission(user, "maintenance:manage")) {
       return NextResponse.json({ message: "غير مصرح" }, { status: 403 })
     }
 
@@ -59,6 +61,14 @@ export async function PUT(request: Request) {
          updated_at = NOW()`,
       [enabled ? "true" : "false"]
     )
+
+    await writeAuditLog({
+      actor: user,
+      action: enabled ? "maintenance.enable" : "maintenance.disable",
+      targetType: "app_setting",
+      targetId: "maintenance_mode",
+      details: { enabled },
+    })
 
     return NextResponse.json({
       status: "success",

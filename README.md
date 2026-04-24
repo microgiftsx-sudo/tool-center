@@ -20,6 +20,22 @@ You can start editing the page by modifying `app/page.tsx`. The page auto-update
 
 This project uses [`next/font`](https://nextjs.org/docs/app/building-your-application/optimizing/fonts) to automatically optimize and load [Geist](https://vercel.com/font), a new font family for Vercel.
 
+## E2E Tests (Playwright)
+
+Set credentials then run:
+
+```bash
+# optional, defaults to http://localhost:3002
+set E2E_BASE_URL=http://localhost:3002
+set E2E_USERNAME=admin
+set E2E_PASSWORD=Admin@123
+
+npm run test:e2e
+```
+
+Current covered flow:
+- Login then logout redirect.
+
 ## Learn More
 
 To learn more about Next.js, take a look at the following resources:

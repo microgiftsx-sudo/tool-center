@@ -62,6 +62,25 @@ CREATE TABLE IF NOT EXISTS app_settings (
 );
 
 -- =========================================
+-- Audit logs
+-- =========================================
+CREATE TABLE IF NOT EXISTS audit_logs (
+  id BIGSERIAL PRIMARY KEY,
+  actor_user_id BIGINT REFERENCES app_users(id) ON DELETE SET NULL,
+  actor_user_name TEXT,
+  actor_role TEXT,
+  action TEXT NOT NULL,
+  target_type TEXT,
+  target_id TEXT,
+  details JSONB NOT NULL DEFAULT '{}'::jsonb,
+  created_at TIMESTAMPTZ NOT NULL DEFAULT NOW()
+);
+
+CREATE INDEX IF NOT EXISTS idx_audit_logs_created_at ON audit_logs (created_at DESC);
+CREATE INDEX IF NOT EXISTS idx_audit_logs_actor ON audit_logs (actor_user_id, created_at DESC);
+CREATE INDEX IF NOT EXISTS idx_audit_logs_action ON audit_logs (action, created_at DESC);
+
+-- =========================================
 -- Excel Extracted Selections
 -- =========================================
 CREATE TABLE IF NOT EXISTS extracted_selections (

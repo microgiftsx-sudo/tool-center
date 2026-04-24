@@ -1,6 +1,8 @@
 import { NextResponse } from "next/server"
 import { getDbPool } from "@/lib/db"
 import { getSessionUserFromRequest } from "@/lib/auth-server"
+import { hasPermission } from "@/lib/permissions"
+import { writeAuditLog } from "@/lib/audit-log"
 
 export const runtime = "nodejs"
 export const dynamic = "force-dynamic"
@@ -12,7 +14,7 @@ type RouteContext = {
 export async function PATCH(request: Request, context: RouteContext) {
   try {
     const sessionUser = await getSessionUserFromRequest(request)
-    if (!sessionUser || sessionUser.role !== "admin") {
+    if (!hasPermission(sessionUser, "users:manage")) {
       return NextResponse.json({ message: "غير مصرح" }, { status: 403 })
     }
 
@@ -80,6 +82,14 @@ export async function PATCH(request: Request, context: RouteContext) {
     }
 
     const row = updated.rows[0]
+    await writeAuditLog({
+      actor: sessionUser,
+      action: password ? "users.update_with_password" : "users.update",
+      targetType: "app_user",
+      targetId: String(userId),
+      details: { fullName, userName, role, isTempPass, passwordChanged: Boolean(password) },
+    })
+
     return NextResponse.json({
       status: "success",
       message: "تم تحديث الحساب بنجاح",

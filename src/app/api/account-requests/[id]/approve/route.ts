@@ -2,6 +2,8 @@ import { randomUUID } from "crypto"
 import { NextResponse } from "next/server"
 import { getDbPool } from "@/lib/db"
 import { getSessionUserFromRequest } from "@/lib/auth-server"
+import { hasPermission } from "@/lib/permissions"
+import { writeAuditLog } from "@/lib/audit-log"
 
 export const runtime = "nodejs"
 export const dynamic = "force-dynamic"
@@ -9,7 +11,7 @@ export const dynamic = "force-dynamic"
 export async function POST(request: Request, context: { params: Promise<{ id: string }> }) {
   try {
     const user = await getSessionUserFromRequest(request)
-    if (!user || user.role !== "admin") {
+    if (!hasPermission(user, "account_requests:review")) {
       return NextResponse.json({ message: "غير مصرح" }, { status: 403 })
     }
 
@@ -63,6 +65,14 @@ export async function POST(request: Request, context: { params: Promise<{ id: st
       }
       throw error
     }
+
+    await writeAuditLog({
+      actor: user,
+      action: "account_requests.approve",
+      targetType: "account_request",
+      targetId: String(requestId),
+      details: { email: reqRow.email as string, requestedRole: reqRow.requested_role as string },
+    })
 
     return NextResponse.json({
       status: "success",

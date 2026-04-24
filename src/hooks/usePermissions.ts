@@ -1,6 +1,19 @@
 "use client";
 
 import { useAuthStore } from "@/store/auth/authStore";
+import type { AppPermission } from "@/lib/permissions";
+
+const rolePermissions: Record<string, AppPermission[]> = {
+  admin: [
+    "account_requests:review",
+    "users:read",
+    "users:manage",
+    "maintenance:read",
+    "maintenance:manage",
+  ],
+  support: ["account_requests:review", "users:read", "maintenance:read"],
+  user: [],
+};
 
 export const usePermissions = () => {
   const { user, isAuthenticated } = useAuthStore();
@@ -29,6 +42,11 @@ export const usePermissions = () => {
     return hasAnyRole(allowedRoles);
   };
 
+  const hasPermission = (permission: AppPermission): boolean => {
+    if (!isAuthenticated || !user?.role) return false;
+    return (rolePermissions[user.role] ?? []).includes(permission);
+  };
+
   return {
     user,
     isAuthenticated,
@@ -37,5 +55,6 @@ export const usePermissions = () => {
     isAdmin,
     isUser,
     canAccess,
+    hasPermission,
   };
 };

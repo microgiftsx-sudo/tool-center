@@ -1,5 +1,7 @@
 import { NextResponse } from "next/server"
 import { getDbPool } from "@/lib/db"
+import { getSessionUserFromToken } from "@/lib/auth-server"
+import { writeAuditLog } from "@/lib/audit-log"
 
 export const runtime = "nodejs"
 export const dynamic = "force-dynamic"
@@ -54,6 +56,14 @@ export async function PUT(request: Request) {
     if (updateRes.rowCount === 0) {
       return NextResponse.json({ message: "كلمة المرور الحالية غير صحيحة" }, { status: 400 })
     }
+
+    const actor = await getSessionUserFromToken(token)
+    await writeAuditLog({
+      actor,
+      action: "users.change_own_password",
+      targetType: "app_user",
+      targetId: String(userId),
+    })
 
     return NextResponse.json({
       status: "success",
