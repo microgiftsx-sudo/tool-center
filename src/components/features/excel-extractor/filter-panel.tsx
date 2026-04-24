@@ -17,11 +17,9 @@ interface FilterPanelProps {
   headers: string[]
   filterColumn: string
   filterValue: string
-  searchMode: "startsWith" | "includes" | "exact"
   selectedColumns: string[]
   onColumnChange: (col: string) => void
   onValueChange: (val: string) => void
-  onSearchModeChange: (mode: "startsWith" | "includes" | "exact") => void
   onToggleColumn: (col: string) => void
   onClearFilter: () => void
 }
@@ -30,11 +28,9 @@ export function FilterPanel({
   headers,
   filterColumn,
   filterValue,
-  searchMode,
   selectedColumns,
   onColumnChange,
   onValueChange,
-  onSearchModeChange,
   onToggleColumn,
   onClearFilter,
 }: FilterPanelProps) {
@@ -56,23 +52,6 @@ export function FilterPanel({
               {headers.map((h) => (
                 <SelectItem key={h} value={h}>{h}</SelectItem>
               ))}
-            </SelectContent>
-          </Select>
-        </div>
-
-        <div className="space-y-1.5">
-          <Label>طريقة البحث</Label>
-          <Select
-            value={searchMode}
-            onValueChange={(v) => onSearchModeChange(v as "startsWith" | "includes" | "exact")}
-          >
-            <SelectTrigger>
-              <SelectValue />
-            </SelectTrigger>
-            <SelectContent>
-              <SelectItem value="startsWith">يبدأ بـ</SelectItem>
-              <SelectItem value="includes">يحتوي على</SelectItem>
-              <SelectItem value="exact">مطابق تمامًا</SelectItem>
             </SelectContent>
           </Select>
         </div>

@@ -5,14 +5,16 @@ import * as XLSX from "xlsx"
 import { FileSpreadsheet, Loader2, RefreshCw, X, Trash2 } from "lucide-react"
 import { Button } from "@/components/ui/button"
 import { Badge } from "@/components/ui/badge"
-import { Tabs, TabsContent, TabsList, TabsTrigger } from "@/components/ui/tabs"
+import { Label } from "@/components/ui/label"
+import { Textarea } from "@/components/ui/textarea"
 import {
-  Dialog,
-  DialogContent,
-  DialogDescription,
-  DialogHeader,
-  DialogTitle,
-} from "@/components/ui/dialog"
+  Select,
+  SelectContent,
+  SelectItem,
+  SelectTrigger,
+  SelectValue,
+} from "@/components/ui/select"
+import { Tabs, TabsContent, TabsList, TabsTrigger } from "@/components/ui/tabs"
 import {
   Table, TableBody, TableCell, TableHead, TableHeader, TableRow,
 } from "@/components/ui/table"
@@ -36,13 +38,10 @@ export default function ExcelExtractorPage() {
   const [headers, setHeaders]     = useState<string[]>([])
   const [allRows, setAllRows]     = useState<Record<string, unknown>[]>([])
   const [selectedKeys, setSelectedKeys] = useState<Set<number>>(new Set())
-  const [searchMode, setSearchMode] = useState<"startsWith" | "includes" | "exact">("startsWith")
+  const [selectedFilterColumn, setSelectedFilterColumn] = useState("")
+  const [selectedFilterValue, setSelectedFilterValue] = useState("")
   const [colorModalCol, setColorModalCol] = useState<string | null>(null)
   const [colorModalKey, setColorModalKey] = useState(0)
-  const [detailsOpen, setDetailsOpen] = useState(false)
-  const [detailsTitle, setDetailsTitle] = useState("")
-  const [detailsHeaders, setDetailsHeaders] = useState<string[]>([])
-  const [detailsRow, setDetailsRow] = useState<Record<string, unknown> | null>(null)
   const [dbHealth, setDbHealth] = useState<"idle" | "checking" | "ok" | "fail">("idle")
   const [dbLastCheckedAt, setDbLastCheckedAt] = useState<string>("")
   const dbCheckInFlightRef = useRef(false)
@@ -128,16 +127,12 @@ export default function ExcelExtractorPage() {
       const cols = filterColumn ? [filterColumn] : headers
       const hasMatch = cols.some((c) => {
         const cellValue = String(row[c] ?? "").toLowerCase()
-        return searchTerms.some((term) => {
-          if (searchMode === "exact") return cellValue === term
-          if (searchMode === "includes") return cellValue.includes(term)
-          return cellValue.startsWith(term)
-        })
+        return searchTerms.some((term) => cellValue.startsWith(term))
       })
       if (hasMatch) acc.push(i)
       return acc
     }, [])
-  }, [allRows, filterColumn, filterValue, headers, searchMode])
+  }, [allRows, filterColumn, filterValue, headers])
 
   const filteredRows   = useMemo(() => filteredIndices.map((i) => allRows[i]), [filteredIndices, allRows])
   const visibleHeaders = useMemo(() => headers.filter((h) => selectedColumns.includes(h)), [headers, selectedColumns])
@@ -173,6 +168,19 @@ export default function ExcelExtractorPage() {
       }),
     [selectedKeys, allRows, visibleHeaders]
   )
+  const selectedRowsWithKey = useMemo(
+    () =>
+      [...selectedKeys]
+        .filter((k) => k < allRows.length)
+        .map((k) => ({
+          key: k,
+          row: visibleHeaders.reduce<Record<string, unknown>>((acc, h) => {
+            acc[h] = allRows[k][h]
+            return acc
+          }, {}),
+        })),
+    [selectedKeys, allRows, visibleHeaders]
+  )
 
   const savedRows = useMemo(() => {
     if (!savedSelection) return []
@@ -183,6 +191,28 @@ export default function ExcelExtractorPage() {
     if (!savedSelection) return []
     return savedSelection.headers
   }, [savedSelection])
+  const savedRowsWithKey = useMemo(
+    () => savedRows.map((row, i) => ({ key: `saved-${i}`, row })),
+    [savedRows]
+  )
+  const selectedTabHeaders = selectedKeys.size > 0 ? visibleHeaders : savedHeaders
+  const selectedTabRows = selectedKeys.size > 0 ? selectedRowsWithKey : savedRowsWithKey
+  const filteredSelectedTabRows = useMemo(() => {
+    const searchTerms = selectedFilterValue
+      .split(/[\n,،]/)
+      .map((v) => v.trim().toLowerCase())
+      .filter(Boolean)
+    if (searchTerms.length === 0) return selectedTabRows
+    return selectedTabRows.filter(({ row }) => {
+      const cols = selectedFilterColumn && selectedTabHeaders.includes(selectedFilterColumn)
+        ? [selectedFilterColumn]
+        : selectedTabHeaders
+      return cols.some((h) => {
+        const cellValue = String(row[h] ?? "").toLowerCase()
+        return searchTerms.some((term) => cellValue.startsWith(term))
+      })
+    })
+  }, [selectedFilterValue, selectedFilterColumn, selectedTabRows, selectedTabHeaders])
 
   async function handleSaveSelection() {
     if (selectedKeys.size === 0 || selectedRows.length === 0) {
@@ -213,22 +243,13 @@ export default function ExcelExtractorPage() {
   function reset() {
     setFileName(""); setHeaders([]); setAllRows([])
     setSelectedKeys(new Set()); setStep("idle")
+    setSelectedFilterColumn("")
+    setSelectedFilterValue("")
     resetSettings()
   }
 
   function openAnotherFilePicker() {
     fileInputRef.current?.click()
-  }
-
-  function openRowDetails(
-    row: Record<string, unknown>,
-    headersForDetails: string[],
-    title: string
-  ) {
-    setDetailsRow(row)
-    setDetailsHeaders(headersForDetails)
-    setDetailsTitle(title)
-    setDetailsOpen(true)
   }
 
   const isProcessing = step !== "idle" && step !== "done"
@@ -335,11 +356,9 @@ export default function ExcelExtractorPage() {
               headers={headers}
               filterColumn={filterColumn}
               filterValue={filterValue}
-              searchMode={searchMode}
               selectedColumns={selectedColumns}
               onColumnChange={setFilterColumn}
               onValueChange={setFilterValue}
-              onSearchModeChange={setSearchMode}
               onToggleColumn={toggleColumn}
               onClearFilter={() => setFilterValue("")}
             />
@@ -416,7 +435,11 @@ export default function ExcelExtractorPage() {
                   </span>
                   <div className="flex items-center gap-2 self-end sm:self-auto">
                     <Badge className="bg-primary/15 text-primary border-primary/30 hover:bg-primary/20">
-                      {selectedKeys.size > 0 ? selectedKeys.size : savedRows.length} صف
+                      {filteredSelectedTabRows.length}
+                      {(selectedKeys.size > 0 ? selectedRowsWithKey.length : savedRowsWithKey.length) !== filteredSelectedTabRows.length
+                        ? ` / ${selectedKeys.size > 0 ? selectedRowsWithKey.length : savedRowsWithKey.length}`
+                        : ""}
+                      {" "}صف
                     </Badge>
                     {selectedKeys.size > 0 && (
                       <Button
@@ -447,6 +470,53 @@ export default function ExcelExtractorPage() {
                     )}
                   </div>
                 </div>
+                {(selectedKeys.size > 0 || savedRows.length > 0) && (
+                  <div className="px-3 sm:px-4 py-3 border-b bg-background space-y-3">
+                    <div className="grid grid-cols-1 sm:grid-cols-2 gap-3">
+                      <div className="space-y-1.5">
+                        <Label>البحث في عمود</Label>
+                        <Select
+                          value={selectedFilterColumn || "__all__"}
+                          onValueChange={(v) => setSelectedFilterColumn(v === "__all__" ? "" : v)}
+                        >
+                          <SelectTrigger>
+                            <SelectValue placeholder="اختر عموداً أو ابحث في الكل" />
+                          </SelectTrigger>
+                          <SelectContent>
+                            <SelectItem value="__all__">— البحث في كل الأعمدة —</SelectItem>
+                            {selectedTabHeaders.map((h) => (
+                              <SelectItem key={h} value={h}>{h}</SelectItem>
+                            ))}
+                          </SelectContent>
+                        </Select>
+                      </div>
+                      <div className="space-y-1.5">
+                        <Label>قيم البحث (متعدد)</Label>
+                        <div className="flex gap-2">
+                          <Textarea
+                            placeholder={"مثال:\nاحمد\nمحمد, خالد"}
+                            value={selectedFilterValue}
+                            onChange={(e) => setSelectedFilterValue(e.target.value)}
+                            className="text-sm min-h-[92px] resize-y"
+                          />
+                          {selectedFilterValue && (
+                            <Button
+                              variant="ghost"
+                              size="icon"
+                              onClick={() => setSelectedFilterValue("")}
+                              className="shrink-0"
+                            >
+                              <X className="w-4 h-4" />
+                            </Button>
+                          )}
+                        </div>
+                        <p className="text-xs text-muted-foreground">
+                          أدخل أكثر من قيمة (كل سطر أو فاصلة). سيتم عرض الصف إذا طابق أي قيمة.
+                        </p>
+                      </div>
+                    </div>
+                  </div>
+                )}
 
                 {(selectedKeys.size === 0 && savedRows.length === 0) ? (
                   (!savedSelectionInitialized || savedSelectionLoading) ? (
@@ -476,21 +546,17 @@ export default function ExcelExtractorPage() {
                       <Table>
                         <TableHeader>
                           <TableRow className="bg-muted/30 hover:bg-muted/30">
-                            {(selectedKeys.size > 0 ? visibleHeaders : savedHeaders).map((h) => (
+                            {selectedTabHeaders.map((h) => (
                               <TableHead key={h} className="whitespace-nowrap text-right text-xs font-semibold py-2">
                                 {h}
                               </TableHead>
                             ))}
-                            <TableHead className="w-20 text-right text-xs font-semibold py-2">
-                              التفاصيل
-                            </TableHead>
                             <TableHead className="w-8" />
                           </TableRow>
                         </TableHeader>
                         <TableBody>
-                          {(selectedKeys.size > 0 ? selectedRows : savedRows).map((row, i) => {
-                            const originalKey = [...selectedKeys][i] ?? `saved-${i}`
-                            const headersToRender = selectedKeys.size > 0 ? visibleHeaders : savedHeaders
+                          {filteredSelectedTabRows.map(({ key: originalKey, row }) => {
+                            const headersToRender = selectedTabHeaders
                             const rowColor = headersToRender.reduce<string | undefined>((found, h) => {
                               if (found) return found
                               return resolveCellColor(colorRules, h, row[h])
@@ -517,33 +583,11 @@ export default function ExcelExtractorPage() {
                                   )
                                 })}
                                 <TableCell className="py-2 px-2">
-                                  <Button
-                                    variant="ghost"
-                                    size="sm"
-                                    onClick={() => {
-                                      const isSelectedView = selectedKeys.size > 0
-                                      if (isSelectedView && typeof originalKey === "number") {
-                                        openRowDetails(
-                                          allRows[originalKey] ?? row,
-                                          headers,
-                                          `تفاصيل الصف ${originalKey + 2}`
-                                        )
-                                        return
-                                      }
-                                      openRowDetails(
-                                        row,
-                                        savedHeaders,
-                                        `تفاصيل صف محفوظ #${i + 1}`
-                                      )
-                                    }}
-                                  >
-                                    عرض
-                                  </Button>
-                                </TableCell>
-                                <TableCell className="py-2 px-2">
                                   {selectedKeys.size > 0 && (
                                     <button
-                                      onClick={() => toggleRow(Number(originalKey))}
+                                      onClick={() => {
+                                        if (typeof originalKey === "number") toggleRow(originalKey)
+                                      }}
                                       className="text-muted-foreground hover:text-destructive transition-colors"
                                     >
                                       <X className="w-3.5 h-3.5" />
@@ -558,8 +602,8 @@ export default function ExcelExtractorPage() {
                     </div>
                     <div className="p-2 sm:p-3">
                       <ExportBar
-                        headers={selectedKeys.size > 0 ? visibleHeaders : savedHeaders}
-                        allRows={selectedKeys.size > 0 ? selectedRows : savedRows}
+                        headers={selectedTabHeaders}
+                        allRows={filteredSelectedTabRows.map(({ row }) => row)}
                         selectedRows={[]}
                         fileName={selectedKeys.size > 0 ? fileName : `${savedSelection?.fileName ?? "saved"}_saved`}
                       />
@@ -612,35 +656,6 @@ export default function ExcelExtractorPage() {
           onSave={handleColorSave}
         />
       )}
-
-      <Dialog open={detailsOpen} onOpenChange={setDetailsOpen}>
-        <DialogContent className="max-w-2xl">
-          <DialogHeader>
-            <DialogTitle>{detailsTitle || "تفاصيل الصف"}</DialogTitle>
-            <DialogDescription>
-              عرض جميع القيم المتاحة لهذا الصف.
-            </DialogDescription>
-          </DialogHeader>
-          <div className="max-h-[60vh] overflow-auto border rounded-lg">
-            <Table>
-              <TableHeader>
-                <TableRow>
-                  <TableHead className="w-[220px]">الحقل</TableHead>
-                  <TableHead>القيمة</TableHead>
-                </TableRow>
-              </TableHeader>
-              <TableBody>
-                {(detailsHeaders.length > 0 ? detailsHeaders : Object.keys(detailsRow ?? {})).map((h) => (
-                  <TableRow key={h}>
-                    <TableCell className="font-medium">{h}</TableCell>
-                    <TableCell>{String(detailsRow?.[h] ?? "")}</TableCell>
-                  </TableRow>
-                ))}
-              </TableBody>
-            </Table>
-          </div>
-        </DialogContent>
-      </Dialog>
     </div>
   )
 }
