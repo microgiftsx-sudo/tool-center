@@ -67,17 +67,15 @@ export default function TopNav() {
             </Link>
           )}
 
-          {user && (
-            <Button
-              variant="outline"
-              size="sm"
-              className="gap-2"
-              onClick={handleLogout}
-            >
-              <LogOut className="w-4 h-4" />
-              <span className="hidden sm:inline">تسجيل خروج</span>
-            </Button>
-          )}
+          <Button
+            variant="outline"
+            size="sm"
+            className="gap-2 text-destructive border-destructive/30 hover:bg-destructive/10 hover:text-destructive"
+            onClick={handleLogout}
+          >
+            <LogOut className="w-4 h-4" />
+            <span>خروج</span>
+          </Button>
         </nav>
 
       </div>

@@ -5,15 +5,6 @@ import * as XLSX from "xlsx"
 import { FileSpreadsheet, Loader2, RefreshCw, X, Trash2 } from "lucide-react"
 import { Button } from "@/components/ui/button"
 import { Badge } from "@/components/ui/badge"
-import { Label } from "@/components/ui/label"
-import { Textarea } from "@/components/ui/textarea"
-import {
-  Select,
-  SelectContent,
-  SelectItem,
-  SelectTrigger,
-  SelectValue,
-} from "@/components/ui/select"
 import { Tabs, TabsContent, TabsList, TabsTrigger } from "@/components/ui/tabs"
 import {
   Table, TableBody, TableCell, TableHead, TableHeader, TableRow,
@@ -38,8 +29,7 @@ export default function ExcelExtractorPage() {
   const [headers, setHeaders]     = useState<string[]>([])
   const [allRows, setAllRows]     = useState<Record<string, unknown>[]>([])
   const [selectedKeys, setSelectedKeys] = useState<Set<number>>(new Set())
-  const [selectedFilterColumn, setSelectedFilterColumn] = useState("")
-  const [selectedFilterValue, setSelectedFilterValue] = useState("")
+  const [activeTab, setActiveTab] = useState<"browse" | "selected">("browse")
   const [colorModalCol, setColorModalCol] = useState<string | null>(null)
   const [colorModalKey, setColorModalKey] = useState(0)
   const [dbHealth, setDbHealth] = useState<"idle" | "checking" | "ok" | "fail">("idle")
@@ -118,6 +108,7 @@ export default function ExcelExtractorPage() {
 
   // ── Filter ───────────────────────────────────────────────────────────────────
   const filteredIndices = useMemo(() => {
+    if (activeTab !== "browse") return allRows.map((_, i) => i)
     const searchTerms = filterValue
       .split(/[\n,،]/)
       .map((v) => v.trim().toLowerCase())
@@ -132,7 +123,7 @@ export default function ExcelExtractorPage() {
       if (hasMatch) acc.push(i)
       return acc
     }, [])
-  }, [allRows, filterColumn, filterValue, headers])
+  }, [activeTab, allRows, filterColumn, filterValue, headers])
 
   const filteredRows   = useMemo(() => filteredIndices.map((i) => allRows[i]), [filteredIndices, allRows])
   const visibleHeaders = useMemo(() => headers.filter((h) => selectedColumns.includes(h)), [headers, selectedColumns])
@@ -198,21 +189,22 @@ export default function ExcelExtractorPage() {
   const selectedTabHeaders = selectedKeys.size > 0 ? visibleHeaders : savedHeaders
   const selectedTabRows = selectedKeys.size > 0 ? selectedRowsWithKey : savedRowsWithKey
   const filteredSelectedTabRows = useMemo(() => {
-    const searchTerms = selectedFilterValue
+    if (activeTab !== "selected") return selectedTabRows
+    const searchTerms = filterValue
       .split(/[\n,،]/)
       .map((v) => v.trim().toLowerCase())
       .filter(Boolean)
     if (searchTerms.length === 0) return selectedTabRows
     return selectedTabRows.filter(({ row }) => {
-      const cols = selectedFilterColumn && selectedTabHeaders.includes(selectedFilterColumn)
-        ? [selectedFilterColumn]
+      const cols = filterColumn && selectedTabHeaders.includes(filterColumn)
+        ? [filterColumn]
         : selectedTabHeaders
       return cols.some((h) => {
         const cellValue = String(row[h] ?? "").toLowerCase()
         return searchTerms.some((term) => cellValue.startsWith(term))
       })
     })
-  }, [selectedFilterValue, selectedFilterColumn, selectedTabRows, selectedTabHeaders])
+  }, [activeTab, selectedTabRows, filterValue, filterColumn, selectedTabHeaders])
 
   async function handleSaveSelection() {
     if (selectedKeys.size === 0 || selectedRows.length === 0) {
@@ -243,8 +235,6 @@ export default function ExcelExtractorPage() {
   function reset() {
     setFileName(""); setHeaders([]); setAllRows([])
     setSelectedKeys(new Set()); setStep("idle")
-    setSelectedFilterColumn("")
-    setSelectedFilterValue("")
     resetSettings()
   }
 
@@ -255,6 +245,12 @@ export default function ExcelExtractorPage() {
   const isProcessing = step !== "idle" && step !== "done"
   const isFilterActive = filterValue.trim().length > 0
   const hasActiveFileView = !!fileName && visibleHeaders.length > 0
+
+  useEffect(() => {
+    if (!hasActiveFileView && activeTab === "browse") {
+      setActiveTab("selected")
+    }
+  }, [hasActiveFileView, activeTab])
 
   async function checkDatabaseHealth(showToast = true) {
     if (dbCheckInFlightRef.current) return
@@ -365,7 +361,7 @@ export default function ExcelExtractorPage() {
           )}
 
           {/* Tabs */}
-          <Tabs defaultValue={hasActiveFileView ? "browse" : "selected"}>
+          <Tabs value={activeTab} onValueChange={(v) => setActiveTab(v as "browse" | "selected")}>
             <div className="overflow-x-auto -mx-1 px-1 pb-1">
               <TabsList className="w-full min-w-max sm:min-w-0 sm:w-full">
               {hasActiveFileView && (
@@ -470,53 +466,6 @@ export default function ExcelExtractorPage() {
                     )}
                   </div>
                 </div>
-                {(selectedKeys.size > 0 || savedRows.length > 0) && (
-                  <div className="px-3 sm:px-4 py-3 border-b bg-background space-y-3">
-                    <div className="grid grid-cols-1 sm:grid-cols-2 gap-3">
-                      <div className="space-y-1.5">
-                        <Label>البحث في عمود</Label>
-                        <Select
-                          value={selectedFilterColumn || "__all__"}
-                          onValueChange={(v) => setSelectedFilterColumn(v === "__all__" ? "" : v)}
-                        >
-                          <SelectTrigger>
-                            <SelectValue placeholder="اختر عموداً أو ابحث في الكل" />
-                          </SelectTrigger>
-                          <SelectContent>
-                            <SelectItem value="__all__">— البحث في كل الأعمدة —</SelectItem>
-                            {selectedTabHeaders.map((h) => (
-                              <SelectItem key={h} value={h}>{h}</SelectItem>
-                            ))}
-                          </SelectContent>
-                        </Select>
-                      </div>
-                      <div className="space-y-1.5">
-                        <Label>قيم البحث (متعدد)</Label>
-                        <div className="flex gap-2">
-                          <Textarea
-                            placeholder={"مثال:\nاحمد\nمحمد, خالد"}
-                            value={selectedFilterValue}
-                            onChange={(e) => setSelectedFilterValue(e.target.value)}
-                            className="text-sm min-h-[92px] resize-y"
-                          />
-                          {selectedFilterValue && (
-                            <Button
-                              variant="ghost"
-                              size="icon"
-                              onClick={() => setSelectedFilterValue("")}
-                              className="shrink-0"
-                            >
-                              <X className="w-4 h-4" />
-                            </Button>
-                          )}
-                        </div>
-                        <p className="text-xs text-muted-foreground">
-                          أدخل أكثر من قيمة (كل سطر أو فاصلة). سيتم عرض الصف إذا طابق أي قيمة.
-                        </p>
-                      </div>
-                    </div>
-                  </div>
-                )}
 
                 {(selectedKeys.size === 0 && savedRows.length === 0) ? (
                   (!savedSelectionInitialized || savedSelectionLoading) ? (

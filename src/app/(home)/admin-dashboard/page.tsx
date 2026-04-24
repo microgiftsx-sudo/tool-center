@@ -247,30 +247,30 @@ export default function AdminDashboardPage() {
   const pending = requests.filter((r) => r.status === "pending")
 
   return (
-    <div className="max-w-6xl mx-auto py-6">
-      <div className="grid grid-cols-1 lg:grid-cols-[240px_1fr] gap-4">
-        <aside className="border rounded-2xl p-3 h-fit sticky top-20 bg-card">
+    <div className="max-w-6xl mx-auto py-4 sm:py-6 px-3 sm:px-0">
+      <div className="grid grid-cols-1 lg:grid-cols-[240px_1fr] gap-3 sm:gap-4">
+        <aside className="border rounded-2xl p-3 h-fit bg-card lg:sticky lg:top-20">
           <div className="flex items-center gap-2 mb-3 px-2">
             <ShieldCheck className="w-4 h-4 text-primary" />
             <p className="font-semibold text-sm">أقسام الأدمن</p>
           </div>
           <div className="space-y-1">
-            <Button variant={activeSection === "requests" ? "default" : "ghost"} className="w-full justify-start" onClick={() => setActiveSection("requests")}>
+            <Button variant={activeSection === "requests" ? "default" : "ghost"} className="w-full justify-center sm:justify-start" onClick={() => setActiveSection("requests")}>
               طلبات الحساب
             </Button>
-            <Button variant={activeSection === "create" ? "default" : "ghost"} className="w-full justify-start" onClick={() => setActiveSection("create")}>
+            <Button variant={activeSection === "create" ? "default" : "ghost"} className="w-full justify-center sm:justify-start" onClick={() => setActiveSection("create")}>
               تسجيل الحسابات
             </Button>
-            <Button variant={activeSection === "users" ? "default" : "ghost"} className="w-full justify-start" onClick={() => setActiveSection("users")}>
+            <Button variant={activeSection === "users" ? "default" : "ghost"} className="w-full justify-center sm:justify-start" onClick={() => setActiveSection("users")}>
               الحسابات الحالية
             </Button>
-            <Button variant={activeSection === "maintenance" ? "default" : "ghost"} className="w-full justify-start" onClick={() => setActiveSection("maintenance")}>
+            <Button variant={activeSection === "maintenance" ? "default" : "ghost"} className="w-full justify-center sm:justify-start" onClick={() => setActiveSection("maintenance")}>
               وضع الصيانة
             </Button>
           </div>
         </aside>
 
-        <div className="space-y-6">
+        <div className="space-y-4 sm:space-y-6">
           <div className="flex items-center gap-3">
             <div className="w-10 h-10 rounded-xl bg-primary/10 flex items-center justify-center">
               <ShieldCheck className="w-5 h-5 text-primary" />
@@ -430,11 +430,11 @@ export default function AdminDashboardPage() {
                 ) : (
                   users.map((account) => (
                     <div key={account.id} className="border rounded-xl p-3">
-                      <div className="flex flex-wrap items-center justify-between gap-2">
+                      <div className="flex flex-col sm:flex-row sm:items-center justify-between gap-1.5 sm:gap-2">
                         <p className="font-medium">
                           {editingUserId === account.id ? userEditForm.fullName : account.fullName}
                         </p>
-                        <span className="text-xs text-muted-foreground">{new Date(account.createdAt).toLocaleString("ar-SA")}</span>
+                        <span className="text-[11px] sm:text-xs text-muted-foreground">{new Date(account.createdAt).toLocaleString("ar-SA")}</span>
                       </div>
                       {editingUserId === account.id ? (
                         <div className="grid grid-cols-1 md:grid-cols-2 gap-2 mt-2">
@@ -479,18 +479,18 @@ export default function AdminDashboardPage() {
                           </div>
                         </div>
                       ) : (
-                        <div className="space-y-1 mt-2">
+                        <div className="space-y-1 mt-2 break-words">
                           <p className="text-sm"><strong>اسم المستخدم:</strong> {account.userName}</p>
                           <p className="text-sm"><strong>الدور:</strong> {account.role}</p>
                           <p className="text-sm"><strong>الحالة:</strong> {account.isTempPass ? "كلمة مرور مؤقتة" : "نشط"}</p>
                         </div>
                       )}
-                      <div className="flex items-center gap-2 mt-3">
+                      <div className="flex flex-col sm:flex-row sm:items-center gap-2 mt-3">
                         {editingUserId === account.id ? (
                           <>
                             <Button
                               size="sm"
-                              className="gap-1.5"
+                              className="gap-1.5 w-full sm:w-auto"
                               onClick={() => saveUserEdit(account.id)}
                               disabled={savingUserId === account.id}
                             >
@@ -501,12 +501,12 @@ export default function AdminDashboardPage() {
                               )}
                               حفظ التعديلات
                             </Button>
-                            <Button size="sm" variant="ghost" onClick={cancelEditUser}>
+                            <Button size="sm" variant="ghost" className="w-full sm:w-auto" onClick={cancelEditUser}>
                               إلغاء
                             </Button>
                           </>
                         ) : (
-                          <Button size="sm" variant="outline" className="gap-1.5" onClick={() => startEditUser(account)}>
+                          <Button size="sm" variant="outline" className="gap-1.5 w-full sm:w-auto" onClick={() => startEditUser(account)}>
                             <Pencil className="w-4 h-4" />
                             تعديل التفاصيل
                           </Button>
