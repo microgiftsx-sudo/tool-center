@@ -12,8 +12,7 @@ import {
   SidebarTrigger,
 } from "@/components/ui/sidebar";
 import { useAuthStore } from "@/store/auth/authStore";
-import apiClient from "@/lib/axiosClients";
-import { toast } from "sonner";
+import { logoutAndRedirect } from "@/lib/auth-client";
 
 export default function Layouts({
   children,
@@ -24,14 +23,7 @@ export default function Layouts({
   const clearAuth = useAuthStore((s) => s.clearAuth);
 
   async function handleLogout() {
-    try {
-      await apiClient.post("/api/auth/logout");
-    } catch {
-      // ignore API logout errors, always clear local session
-    }
-    clearAuth();
-    toast.success("تم تسجيل الخروج");
-    router.push("/login");
+    await logoutAndRedirect({ clearAuth, router });
   }
 
   return (

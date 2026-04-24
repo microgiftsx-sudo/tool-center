@@ -1,7 +1,6 @@
 import { NextResponse } from "next/server"
 import { getDbPool } from "@/lib/db"
-import { getSessionUserFromRequest } from "@/lib/auth-server"
-import { hasPermission } from "@/lib/permissions"
+import { requirePermissionFromRequest } from "@/lib/api-route-auth"
 
 export const runtime = "nodejs"
 export const dynamic = "force-dynamic"
@@ -66,10 +65,8 @@ export async function POST(request: Request) {
 
 export async function GET(request: Request) {
   try {
-    const user = await getSessionUserFromRequest(request)
-    if (!hasPermission(user, "account_requests:review")) {
-      return NextResponse.json({ message: "غير مصرح" }, { status: 403 })
-    }
+    const auth = await requirePermissionFromRequest(request, "account_requests:review")
+    if (!auth.ok) return auth.response
 
     const pool = getDbPool()
     const result = await pool.query(

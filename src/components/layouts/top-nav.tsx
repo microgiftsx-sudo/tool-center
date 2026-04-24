@@ -6,8 +6,7 @@ import { LayoutGrid, LogOut, ShieldCheck } from "lucide-react"
 import { cn } from "@/lib/utils"
 import { Button } from "@/components/ui/button"
 import { useAuthStore } from "@/store/auth/authStore"
-import apiClient from "@/lib/axiosClients"
-import { toast } from "sonner"
+import { logoutAndRedirect } from "@/lib/auth-client"
 
 export default function TopNav() {
   const pathname = usePathname()
@@ -16,14 +15,7 @@ export default function TopNav() {
   const clearAuth = useAuthStore((s) => s.clearAuth)
 
   async function handleLogout() {
-    try {
-      await apiClient.post("/api/auth/logout")
-    } catch {
-      // ignore server logout errors, always clear local session
-    }
-    clearAuth()
-    toast.success("تم تسجيل الخروج")
-    router.push("/login")
+    await logoutAndRedirect({ clearAuth, router })
   }
 
   return (

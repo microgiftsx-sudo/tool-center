@@ -35,7 +35,7 @@ import {
 } from "@/components/ui/sidebar"
 import { useTheme } from "@/context/theme-context"
 import { useAuthStore } from "@/store/auth/authStore"
-import apiClient from "@/lib/axiosClients"
+import { logoutAndRedirect } from "@/lib/auth-client"
 
 export function NavUser() {
   const { isMobile } = useSidebar()
@@ -43,13 +43,7 @@ export function NavUser() {
   const { user, clearAuth } = useAuthStore()
 
   const handleLogout = async () => {
-    try {
-      await apiClient.post("/api/auth/logout")
-    } catch {
-      // ignore logout API errors and always clear local session
-    }
-    clearAuth() // Clears localStorage + cookie
-    router.push('/login')
+    await logoutAndRedirect({ clearAuth, router, showToast: false })
   }
 
   // If no user, don't render anything or show loading state

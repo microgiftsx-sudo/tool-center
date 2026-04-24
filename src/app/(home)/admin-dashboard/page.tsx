@@ -8,9 +8,8 @@ import { Button } from "@/components/ui/button"
 import { Card, CardContent, CardHeader, CardTitle, CardDescription } from "@/components/ui/card"
 import { Input } from "@/components/ui/input"
 import { Label } from "@/components/ui/label"
-import { tokenManager } from "@/lib/tokenManager"
-import { Textarea } from "@/components/ui/textarea"
 import { hasPermission } from "@/lib/permissions"
+import apiClient from "@/lib/axiosClients"
 
 type AccountRequest = {
   id: number
@@ -49,12 +48,18 @@ type AuditLogEntry = {
   createdAt: string
 }
 
+type AdminSection = "requests" | "create" | "users" | "maintenance" | "audit"
+
+function getApiErrorMessage(error: unknown) {
+  return (error as { response?: { data?: { message?: string } } })?.response?.data?.message
+}
+
 export default function AdminDashboardPage() {
   const user = useAuthStore((s) => s.user)
   const [loading, setLoading] = useState(true)
   const [requests, setRequests] = useState<AccountRequest[]>([])
   const [processingId, setProcessingId] = useState<number | null>(null)
-  const [activeSection, setActiveSection] = useState<"requests" | "create" | "users" | "maintenance" | "audit">("requests")
+  const [activeSection, setActiveSection] = useState<AdminSection>("requests")
   const [maintenanceLoading, setMaintenanceLoading] = useState(true)
   const [maintenanceEnabled, setMaintenanceEnabled] = useState(false)
   const [maintenanceSource, setMaintenanceSource] = useState<"db" | "env">("db")
@@ -80,23 +85,24 @@ export default function AdminDashboardPage() {
     password: "",
   })
 
-  async function authedFetch(url: string, init?: RequestInit) {
-    const token = tokenManager.getToken()
-    const headers = new Headers(init?.headers)
-    headers.set("Content-Type", "application/json")
-    if (token) headers.set("Authorization", `Bearer ${token}`)
-    const res = await fetch(url, { ...init, headers })
-    const json = (await res.json().catch(() => ({}))) as Record<string, unknown>
-    if (!res.ok) {
-      throw { response: { data: json } }
-    }
-    return json
+  async function getJson<T>(url: string): Promise<T> {
+    const res = await apiClient.get(url)
+    return res.data as T
+  }
+
+  async function sendJson<T>(method: "POST" | "PATCH" | "PUT", url: string, body?: unknown): Promise<T> {
+    const res = await apiClient.request({
+      method,
+      url,
+      data: body,
+    })
+    return res.data as T
   }
 
   async function loadRequests() {
     setLoading(true)
     try {
-      const res = await authedFetch("/api/account-requests")
+      const res = await getJson<{ data?: AccountRequest[] }>("/api/account-requests")
       const data = (res as { data?: AccountRequest[] })?.data ?? []
       setRequests(data)
     } catch {
@@ -109,7 +115,7 @@ export default function AdminDashboardPage() {
   async function loadMaintenance() {
     setMaintenanceLoading(true)
     try {
-      const res = await authedFetch("/api/admin/system/maintenance")
+      const res = await getJson<{ data?: { enabled?: boolean; source?: "db" | "env" } }>("/api/admin/system/maintenance")
       const data = (res as { data?: { enabled?: boolean; source?: "db" | "env" } }).data
       setMaintenanceEnabled(Boolean(data?.enabled))
       setMaintenanceSource((data?.source ?? "db") as "db" | "env")
@@ -123,7 +129,7 @@ export default function AdminDashboardPage() {
   async function loadUsers() {
     setUsersLoading(true)
     try {
-      const res = await authedFetch("/api/auth/users")
+      const res = await getJson<{ data?: { items?: AppUser[] } }>("/api/auth/users")
       const data = (res as { data?: { items?: AppUser[] } }).data?.items ?? []
       setUsers(data)
     } catch {
@@ -141,7 +147,7 @@ export default function AdminDashboardPage() {
       if (auditActionFilter.trim()) params.set("action", auditActionFilter.trim())
       params.set("limit", "120")
       const query = params.toString()
-      const res = await authedFetch(`/api/admin/audit-logs${query ? `?${query}` : ""}`)
+      const res = await getJson<{ data?: AuditLogEntry[] }>(`/api/admin/audit-logs${query ? `?${query}` : ""}`)
       const data = (res as { data?: AuditLogEntry[] })?.data ?? []
       setAuditLogs(data)
     } catch {
@@ -153,15 +159,12 @@ export default function AdminDashboardPage() {
 
   async function toggleMaintenance(nextState: boolean) {
     try {
-      await authedFetch("/api/admin/system/maintenance", {
-        method: "PUT",
-        body: JSON.stringify({ enabled: nextState }),
-      })
+      await sendJson("PUT", "/api/admin/system/maintenance", { enabled: nextState })
       setMaintenanceEnabled(nextState)
       toast.success(nextState ? "تم تفعيل وضع الصيانة" : "تم إيقاف وضع الصيانة")
       await loadMaintenance()
     } catch (error) {
-      const msg = (error as { response?: { data?: { message?: string } } })?.response?.data?.message
+      const msg = getApiErrorMessage(error)
       toast.error(msg || "فشل تحديث وضع الصيانة")
     }
   }
@@ -188,12 +191,12 @@ export default function AdminDashboardPage() {
   async function approveRequest(id: number) {
     setProcessingId(id)
     try {
-      const res = await authedFetch(`/api/account-requests/${id}/approve`, { method: "POST" })
+      const res = await sendJson<{ data?: { email?: string; tempPassword?: string } }>("POST", `/api/account-requests/${id}/approve`)
       const payload = (res as { data?: { email?: string; tempPassword?: string } })?.data
       toast.success(`تمت الموافقة. البريد: ${payload?.email ?? ""} - كلمة مرور مؤقتة: ${payload?.tempPassword ?? ""}`)
       await loadRequests()
     } catch (error) {
-      const msg = (error as { response?: { data?: { message?: string } } })?.response?.data?.message
+      const msg = getApiErrorMessage(error)
       toast.error(msg || "فشلت عملية الموافقة")
     } finally {
       setProcessingId(null)
@@ -203,14 +206,11 @@ export default function AdminDashboardPage() {
   async function rejectRequest(id: number) {
     setProcessingId(id)
     try {
-      await authedFetch(`/api/account-requests/${id}/reject`, {
-        method: "POST",
-        body: JSON.stringify({ reason: "rejected by admin" }),
-      })
+      await sendJson("POST", `/api/account-requests/${id}/reject`, { reason: "rejected by admin" })
       toast.success("تم رفض الطلب")
       await loadRequests()
     } catch (error) {
-      const msg = (error as { response?: { data?: { message?: string } } })?.response?.data?.message
+      const msg = getApiErrorMessage(error)
       toast.error(msg || "فشلت عملية الرفض")
     } finally {
       setProcessingId(null)
@@ -220,17 +220,14 @@ export default function AdminDashboardPage() {
   async function createEmailAccount(e: React.FormEvent) {
     e.preventDefault()
     try {
-      const res = await authedFetch("/api/admin/users", {
-        method: "POST",
-        body: JSON.stringify(createForm),
-      })
+      const res = await sendJson<{ data?: { email?: string; password?: string } }>("POST", "/api/admin/users", createForm)
       const payload = (res as { data?: { email?: string; password?: string } })?.data
       toast.success(`تم إنشاء الحساب: ${payload?.email ?? ""} ${payload?.password ? `- كلمة المرور: ${payload.password}` : ""}`)
       setCreateForm({ fullName: "", email: "", role: "user", password: "" })
       await loadRequests()
       await loadUsers()
     } catch (error) {
-      const msg = (error as { response?: { data?: { message?: string } } })?.response?.data?.message
+      const msg = getApiErrorMessage(error)
       toast.error(msg || "فشل إنشاء الحساب")
     }
   }
@@ -262,15 +259,12 @@ export default function AdminDashboardPage() {
             role: userEditForm.role,
             isTempPass: userEditForm.isTempPass,
           }
-      await authedFetch(`/api/admin/users/${userId}`, {
-        method: "PATCH",
-        body: JSON.stringify(payload),
-      })
+      await sendJson("PATCH", `/api/admin/users/${userId}`, payload)
       toast.success("تم تحديث تفاصيل الحساب")
       setEditingUserId(null)
       await loadUsers()
     } catch (error) {
-      const msg = (error as { response?: { data?: { message?: string } } })?.response?.data?.message
+      const msg = getApiErrorMessage(error)
       toast.error(msg || "فشل تحديث الحساب")
     } finally {
       setSavingUserId(null)
@@ -283,7 +277,15 @@ export default function AdminDashboardPage() {
     canReadUsers ? "users" : null,
     canReadMaintenance ? "maintenance" : null,
     canReadAudit ? "audit" : null,
-  ].filter(Boolean) as Array<"requests" | "create" | "users" | "maintenance" | "audit">
+  ].filter(Boolean) as AdminSection[]
+
+  const sectionLabels: Record<AdminSection, string> = {
+    requests: "طلبات الحساب",
+    create: "تسجيل الحسابات",
+    users: "الحسابات الحالية",
+    maintenance: "وضع الصيانة",
+    audit: "سجل التدقيق",
+  }
 
   useEffect(() => {
     if (availableSections.length > 0 && !availableSections.includes(activeSection)) {
@@ -316,76 +318,20 @@ export default function AdminDashboardPage() {
           </div>
           <div className="space-y-1">
             <ul className="space-y-1 text-sm">
-              {canReviewRequests && (
-                <li>
+              {availableSections.map((section) => (
+                <li key={section}>
                   <button
                     className={`w-full rounded-lg px-3 py-2 text-right transition-colors ${
-                      activeSection === "requests"
+                      activeSection === section
                         ? "bg-primary text-primary-foreground"
                         : "hover:bg-muted text-foreground"
                     }`}
-                    onClick={() => setActiveSection("requests")}
+                    onClick={() => setActiveSection(section)}
                   >
-                    • طلبات الحساب
+                    • {sectionLabels[section]}
                   </button>
                 </li>
-              )}
-              {canManageUsers && (
-                <li>
-                  <button
-                    className={`w-full rounded-lg px-3 py-2 text-right transition-colors ${
-                      activeSection === "create"
-                        ? "bg-primary text-primary-foreground"
-                        : "hover:bg-muted text-foreground"
-                    }`}
-                    onClick={() => setActiveSection("create")}
-                  >
-                    • تسجيل الحسابات
-                  </button>
-                </li>
-              )}
-              {canReadUsers && (
-                <li>
-                  <button
-                    className={`w-full rounded-lg px-3 py-2 text-right transition-colors ${
-                      activeSection === "users"
-                        ? "bg-primary text-primary-foreground"
-                        : "hover:bg-muted text-foreground"
-                    }`}
-                    onClick={() => setActiveSection("users")}
-                  >
-                    • الحسابات الحالية
-                  </button>
-                </li>
-              )}
-              {canReadMaintenance && (
-                <li>
-                  <button
-                    className={`w-full rounded-lg px-3 py-2 text-right transition-colors ${
-                      activeSection === "maintenance"
-                        ? "bg-primary text-primary-foreground"
-                        : "hover:bg-muted text-foreground"
-                    }`}
-                    onClick={() => setActiveSection("maintenance")}
-                  >
-                    • وضع الصيانة
-                  </button>
-                </li>
-              )}
-              {canReadAudit && (
-                <li>
-                  <button
-                    className={`w-full rounded-lg px-3 py-2 text-right transition-colors ${
-                      activeSection === "audit"
-                        ? "bg-primary text-primary-foreground"
-                        : "hover:bg-muted text-foreground"
-                    }`}
-                    onClick={() => setActiveSection("audit")}
-                  >
-                    • سجل التدقيق
-                  </button>
-                </li>
-              )}
+              ))}
             </ul>
           </div>
         </aside>

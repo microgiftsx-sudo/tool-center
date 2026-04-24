@@ -1,8 +1,7 @@
 import { randomUUID } from "crypto"
 import { NextResponse } from "next/server"
 import { getDbPool } from "@/lib/db"
-import { getSessionUserFromRequest } from "@/lib/auth-server"
-import { hasPermission } from "@/lib/permissions"
+import { requirePermissionFromRequest } from "@/lib/api-route-auth"
 import { writeAuditLog } from "@/lib/audit-log"
 
 export const runtime = "nodejs"
@@ -10,13 +9,9 @@ export const dynamic = "force-dynamic"
 
 export async function POST(request: Request, context: { params: Promise<{ id: string }> }) {
   try {
-    const user = await getSessionUserFromRequest(request)
-    if (!hasPermission(user, "account_requests:review")) {
-      return NextResponse.json({ message: "غير مصرح" }, { status: 403 })
-    }
-    if (!user) {
-      return NextResponse.json({ message: "غير مصرح" }, { status: 403 })
-    }
+    const auth = await requirePermissionFromRequest(request, "account_requests:review")
+    if (!auth.ok) return auth.response
+    const user = auth.user
 
     const { id } = await context.params
     const requestId = Number(id)

@@ -1,17 +1,14 @@
 import { NextResponse } from "next/server"
 import { getDbPool } from "@/lib/db"
-import { getSessionUserFromRequest } from "@/lib/auth-server"
-import { hasPermission } from "@/lib/permissions"
+import { requirePermissionFromRequest } from "@/lib/api-route-auth"
 
 export const runtime = "nodejs"
 export const dynamic = "force-dynamic"
 
 export async function GET(request: Request) {
   try {
-    const user = await getSessionUserFromRequest(request)
-    if (!hasPermission(user, "audit_logs:read")) {
-      return NextResponse.json({ message: "غير مصرح" }, { status: 403 })
-    }
+    const auth = await requirePermissionFromRequest(request, "audit_logs:read")
+    if (!auth.ok) return auth.response
 
     const url = new URL(request.url)
     const q = String(url.searchParams.get("q") ?? "").trim().toLowerCase()

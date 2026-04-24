@@ -8,7 +8,7 @@ export type AppPermission =
   | "maintenance:manage"
   | "audit_logs:read"
 
-const rolePermissions: Record<string, AppPermission[]> = {
+export const rolePermissions: Record<string, AppPermission[]> = {
   admin: [
     "account_requests:review",
     "users:read",

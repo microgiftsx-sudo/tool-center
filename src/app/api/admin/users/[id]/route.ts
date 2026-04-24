@@ -1,7 +1,6 @@
 import { NextResponse } from "next/server"
 import { getDbPool } from "@/lib/db"
-import { getSessionUserFromRequest } from "@/lib/auth-server"
-import { hasPermission } from "@/lib/permissions"
+import { requirePermissionFromRequest } from "@/lib/api-route-auth"
 import { writeAuditLog } from "@/lib/audit-log"
 
 export const runtime = "nodejs"
@@ -13,10 +12,9 @@ type RouteContext = {
 
 export async function PATCH(request: Request, context: RouteContext) {
   try {
-    const sessionUser = await getSessionUserFromRequest(request)
-    if (!hasPermission(sessionUser, "users:manage")) {
-      return NextResponse.json({ message: "غير مصرح" }, { status: 403 })
-    }
+    const auth = await requirePermissionFromRequest(request, "users:manage")
+    if (!auth.ok) return auth.response
+    const sessionUser = auth.user
 
     const { id } = await context.params
     const userId = Number(id)

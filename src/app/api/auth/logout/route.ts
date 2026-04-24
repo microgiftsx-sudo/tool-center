@@ -1,21 +1,14 @@
 import { NextResponse } from "next/server"
 import { getDbPool } from "@/lib/db"
-import { getSessionUserFromToken } from "@/lib/auth-server"
+import { extractBearerToken, getSessionUserFromToken } from "@/lib/auth-server"
 import { writeAuditLog } from "@/lib/audit-log"
 
 export const runtime = "nodejs"
 export const dynamic = "force-dynamic"
 
-function extractToken(request: Request) {
-  const auth = request.headers.get("authorization")
-  if (!auth) return null
-  if (!auth.startsWith("Bearer ")) return null
-  return auth.replace("Bearer ", "").trim()
-}
-
 export async function POST(request: Request) {
   try {
-    const token = extractToken(request)
+    const token = extractBearerToken(request)
     if (!token) return NextResponse.json({ ok: true })
     const actor = await getSessionUserFromToken(token)
 
