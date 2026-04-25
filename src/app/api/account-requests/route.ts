@@ -1,6 +1,7 @@
 import { NextResponse } from "next/server"
 import { getDbPool } from "@/lib/db"
 import { requirePermissionFromRequest } from "@/lib/api-route-auth"
+import { isValidRole } from "@/lib/roles"
 
 export const runtime = "nodejs"
 export const dynamic = "force-dynamic"
@@ -30,6 +31,9 @@ export async function POST(request: Request) {
     if (!emailRegex.test(email)) {
       return NextResponse.json({ message: "البريد الإلكتروني غير صالح", field: "email" }, { status: 400 })
     }
+    if (!isValidRole(requestedRole)) {
+      return NextResponse.json({ message: "الدور المطلوب غير صالح", field: "requestedRole" }, { status: 400 })
+    }
 
     const pool = getDbPool()
     const existingUser = await pool.query("SELECT id FROM app_users WHERE lower(user_name) = lower($1) LIMIT 1", [email])
@@ -54,7 +58,7 @@ export async function POST(request: Request) {
     await pool.query(
       `INSERT INTO account_requests (full_name, email, requested_role, notes, status)
        VALUES ($1, $2, $3, $4, 'pending')`,
-      [fullName, email, requestedRole || "user", notes || null]
+      [fullName, email, requestedRole, notes || null]
     )
 
     return NextResponse.json({ status: "success", message: "تم إرسال طلب الحساب بنجاح" })

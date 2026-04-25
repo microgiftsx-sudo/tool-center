@@ -2,6 +2,7 @@ import { NextResponse } from "next/server"
 import { getDbPool } from "@/lib/db"
 import { requirePermissionFromRequest } from "@/lib/api-route-auth"
 import { writeAuditLog } from "@/lib/audit-log"
+import { isValidRole } from "@/lib/roles"
 
 export const runtime = "nodejs"
 export const dynamic = "force-dynamic"
@@ -45,6 +46,12 @@ export async function PATCH(request: Request, context: RouteContext) {
     if (password && password.length < 6) {
       return NextResponse.json(
         { message: "كلمة المرور الجديدة يجب أن تكون 6 أحرف على الأقل" },
+        { status: 400 }
+      )
+    }
+    if (!isValidRole(role)) {
+      return NextResponse.json(
+        { message: "الدور غير صالح" },
         { status: 400 }
       )
     }

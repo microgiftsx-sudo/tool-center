@@ -1,5 +1,5 @@
 import { NextResponse } from "next/server"
-import { ensureExtractedSelectionsTable, getDbPool } from "@/lib/db"
+import { getDbPool } from "@/lib/db"
 
 export const runtime = "nodejs"
 export const dynamic = "force-dynamic"
@@ -26,7 +26,6 @@ export async function GET() {
   }
 
   try {
-    await ensureExtractedSelectionsTable()
     const pool = getDbPool()
     const result = await pool.query(
       "SELECT file_name, headers, rows, saved_at FROM extracted_selections WHERE id = $1 LIMIT 1",
@@ -70,7 +69,6 @@ export async function PUT(request: Request) {
       return NextResponse.json({ message: "DATABASE_URL is missing" }, { status: 500 })
     }
 
-    await ensureExtractedSelectionsTable()
     const pool = getDbPool()
     await pool.query(
       `INSERT INTO extracted_selections (id, file_name, headers, rows, saved_at, updated_at)
@@ -99,7 +97,6 @@ export async function DELETE() {
       return NextResponse.json({ message: "DATABASE_URL is missing" }, { status: 500 })
     }
 
-    await ensureExtractedSelectionsTable()
     const pool = getDbPool()
     await pool.query("DELETE FROM extracted_selections WHERE id = $1", [RECORD_ID])
     return NextResponse.json({ ok: true })

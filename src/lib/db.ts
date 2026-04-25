@@ -20,17 +20,3 @@ export function getDbPool() {
 
   return global.__toolsHubPgPool
 }
-
-export async function ensureExtractedSelectionsTable() {
-  const pool = getDbPool()
-  await pool.query(`
-    CREATE TABLE IF NOT EXISTS extracted_selections (
-      id TEXT PRIMARY KEY,
-      file_name TEXT NOT NULL,
-      headers JSONB NOT NULL,
-      rows JSONB NOT NULL,
-      saved_at TIMESTAMPTZ NOT NULL,
-      updated_at TIMESTAMPTZ NOT NULL DEFAULT NOW()
-    )
-  `)
-}

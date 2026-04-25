@@ -3,6 +3,7 @@ import { NextResponse } from "next/server"
 import { getDbPool } from "@/lib/db"
 import { requirePermissionFromRequest } from "@/lib/api-route-auth"
 import { writeAuditLog } from "@/lib/audit-log"
+import { isValidRole } from "@/lib/roles"
 
 export const runtime = "nodejs"
 export const dynamic = "force-dynamic"
@@ -35,6 +36,10 @@ export async function POST(request: Request, context: { params: Promise<{ id: st
     if ((reqRow.status as string) !== "pending") {
       return NextResponse.json({ message: "تمت معالجة هذا الطلب مسبقًا" }, { status: 409 })
     }
+    const requestedRole = String(reqRow.requested_role ?? "user")
+    if (!isValidRole(requestedRole)) {
+      return NextResponse.json({ message: "الدور المطلوب في الطلب غير صالح" }, { status: 400 })
+    }
 
     const tempPassword = randomUUID().slice(0, 10)
     await pool.query("BEGIN")
@@ -42,7 +47,7 @@ export async function POST(request: Request, context: { params: Promise<{ id: st
       await pool.query(
         `INSERT INTO app_users (user_name, full_name, role, password_hash, is_temp_pass)
          VALUES ($1, $2, $3, crypt($4, gen_salt('bf')), true)`,
-        [reqRow.email as string, reqRow.full_name as string, (reqRow.requested_role as string) || "user", tempPassword]
+        [reqRow.email as string, reqRow.full_name as string, requestedRole, tempPassword]
       )
 
       await pool.query(
