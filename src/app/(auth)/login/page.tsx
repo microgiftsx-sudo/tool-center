@@ -1,6 +1,5 @@
 "use client";
 
-import Link from "next/link";
 import { useState } from "react";
 import { useRouter } from "next/navigation";
 import { Button } from "@/components/ui/button";
@@ -238,12 +237,6 @@ export default function LoginPage() {
                   تسجيل الدخول
                 </Button>
               </form>
-              <p className="text-sm text-center text-muted-foreground mt-4">
-                ليس لديك حساب؟{" "}
-                <Link href="/register" className="text-primary hover:underline">
-                  طلب حساب من المطورين
-                </Link>
-              </p>
             </CardContent>
           </>
         ) : (

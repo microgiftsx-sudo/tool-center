@@ -13,6 +13,8 @@ import { FilterPanel } from "@/components/features/excel-extractor/filter-panel"
 import { ResultsTable } from "@/components/features/excel-extractor/results-table"
 import { ExportBar } from "@/components/features/excel-extractor/export-bar"
 import { ProcessingProgress, ProcessingStep } from "@/components/features/excel-extractor/processing-progress"
+import { FileUploadZone } from "@/components/features/excel-extractor/file-upload-zone"
+import { RecentFilesSection } from "@/components/features/excel-extractor/recent-files-section"
 import {
   ColorRuleModal, ColorRule, resolveCellColor,
 } from "@/components/features/excel-extractor/color-rule-modal"
@@ -44,6 +46,8 @@ export default function ExcelExtractorPage() {
     selectedColumns, setSelectedColumns, toggleColumn,
     colorRules, updateColorRule,
     resetSettings,
+    recentFiles, isLoading: recentFilesLoading, isInitialized: recentFilesInitialized,
+    addRecentFile, restoreFromRecent, removeRecentFile, clearRecentFiles,
   } = useExcelExtractorStore()
 
   const logActivity = useActivityStore((s) => s.log)
@@ -91,6 +95,14 @@ export default function ExcelExtractorPage() {
             setFileName(baseName)
 
             setStep("done")
+            addRecentFile({
+              fileName: baseName,
+              uploadedAt: new Date().toISOString(),
+              rowCount: rows.length,
+              headers: hdrs,
+              colorRules: useExcelExtractorStore.getState().colorRules,
+              selectedColumns: matching.length > 0 ? matching : hdrs,
+            })
             logActivity({
               tool: "excel-extractor",
               label: `تحميل ${rows.length} صف من "${baseName}"`,
@@ -313,7 +325,7 @@ export default function ExcelExtractorPage() {
         )}
       </div>
 
-      {!isProcessing && (
+      {!isProcessing && hasActiveFileView && (
         <div className="flex justify-start">
           <Button
             variant="outline"
@@ -324,6 +336,23 @@ export default function ExcelExtractorPage() {
             <RefreshCw className="w-4 h-4" />
             اختيار ملف آخر
           </Button>
+        </div>
+      )}
+
+      {!isProcessing && !hasActiveFileView && (
+        <div className="space-y-5">
+          <FileUploadZone onFile={handleFile} />
+          <RecentFilesSection
+            recentFiles={recentFiles}
+            isLoading={recentFilesLoading}
+            isInitialized={recentFilesInitialized}
+            onRestore={(entry) => {
+              restoreFromRecent(entry)
+              toast.success(`تمت استعادة إعدادات "${entry.fileName}"`)
+            }}
+            onRemove={removeRecentFile}
+            onClear={clearRecentFiles}
+          />
         </div>
       )}
 

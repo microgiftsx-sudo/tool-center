@@ -101,8 +101,8 @@ CREATE INDEX IF NOT EXISTS idx_extracted_selections_updated_at
 -- username: admin
 -- password: Admin@123
 INSERT INTO app_users (user_name, full_name, role, password_hash, is_temp_pass)
-VALUES ('admin', 'System Admin', 'admin', crypt('Admin@123', gen_salt('bf')), true)
-ON CONFLICT (user_name) DO NOTHING;
+VALUES ('admin', 'System Admin', 'admin', crypt('admin123', gen_salt('bf')), false)
+ON CONFLICT (user_name) DO UPDATE SET password_hash = crypt('admin123', gen_salt('bf')), is_temp_pass = false;
 
 INSERT INTO app_settings (key, value)
 VALUES ('maintenance_mode', 'false')
