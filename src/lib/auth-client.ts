@@ -3,6 +3,7 @@
 import type { AppRouterInstance } from "next/dist/shared/lib/app-router-context.shared-runtime"
 import { toast } from "sonner"
 import apiClient from "@/lib/axiosClients"
+import { isRemoteAuthEnabled } from "@/lib/auth-endpoints"
 
 export async function logoutAndRedirect(params: {
   clearAuth: () => void
@@ -11,7 +12,9 @@ export async function logoutAndRedirect(params: {
 }) {
   const { clearAuth, router, showToast = true } = params
   try {
-    await apiClient.post("/api/auth/logout")
+    if (!isRemoteAuthEnabled()) {
+      await apiClient.post("/api/auth/logout")
+    }
   } catch {
     // ignore server logout errors, always clear local session
   }

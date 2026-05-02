@@ -10,6 +10,7 @@ import { Input } from "@/components/ui/input"
 import { Label } from "@/components/ui/label"
 import { hasPermission } from "@/lib/permissions"
 import apiClient from "@/lib/axiosClients"
+import { getAuthEndpoint } from "@/lib/auth-endpoints"
 
 type AccountRequest = {
   id: number
@@ -129,8 +130,10 @@ export default function AdminDashboardPage() {
   async function loadUsers() {
     setUsersLoading(true)
     try {
-      const res = await getJson<{ data?: { items?: AppUser[] } }>("/api/auth/users")
-      const data = (res as { data?: { items?: AppUser[] } }).data?.items ?? []
+      const res = await getJson<{ data?: { items?: AppUser[] }; items?: AppUser[] }>(getAuthEndpoint("users"))
+      const data = (res as { data?: { items?: AppUser[] }; items?: AppUser[] }).data?.items
+        ?? (res as { data?: { items?: AppUser[] }; items?: AppUser[] }).items
+        ?? []
       setUsers(data)
     } catch {
       toast.error("تعذر تحميل الحسابات الحالية")

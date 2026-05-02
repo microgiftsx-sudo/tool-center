@@ -1,6 +1,7 @@
 'use client'
 import { useState, useCallback, useEffect, useRef } from "react";
 import apiClient, { apiAuth }from "@/lib/axiosClients";
+import { getAuthEndpoint } from "@/lib/auth-endpoints";
 import type { 
   LoginCredentials, 
   RegisterUserData, 
@@ -11,15 +12,6 @@ import type {
   UsersListResponse,
   AuthApiResponse 
 } from "@/store/auth/authTypes";
-
-const useRemoteAuth = process.env.NEXT_PUBLIC_ENABLE_REMOTE_AUTH === "true";
-const authBasePath = useRemoteAuth ? "/auth" : "/api/auth";
-
-function resolveUrl(path: string) {
-  if (useRemoteAuth) return path;
-  if (typeof window !== "undefined") return `${window.location.origin}${path}`;
-  return path;
-}
 
 interface LoadingState {
   login: boolean;
@@ -75,7 +67,7 @@ export const useAuth = () => {
 
   const login = useCallback(async (options: MutationOptions<LoginCredentials> = {}, retryAttempts = 0): Promise<AuthApiResponse<LoginResponse> | null> => {
     const { data: credentials, customEndpoint, onSuccess, onError } = options;
-    const url = resolveUrl(customEndpoint || `${authBasePath}/login`);
+    const url = customEndpoint || getAuthEndpoint("login");
 
     cancel();
     abortControllerRef.current = new AbortController();
@@ -126,7 +118,7 @@ export const useAuth = () => {
 
   const register = useCallback(async (options: MutationOptions<RegisterUserData> = {}): Promise<AuthApiResponse<RegisterResponse> | null> => {
     const { data: userData, customEndpoint, onSuccess, onError } = options;
-    const url = resolveUrl(customEndpoint || `${authBasePath}/register`);
+    const url = customEndpoint || getAuthEndpoint("register");
 
     cancel();
     abortControllerRef.current = new AbortController();
@@ -163,7 +155,7 @@ export const useAuth = () => {
 
   const resetPassword = useCallback(async (options: MutationOptions<{ email: string }> = {}): Promise<void> => {
     const { data: emailData, customEndpoint, onSuccess, onError } = options;
-    const url = resolveUrl(customEndpoint || `${authBasePath}/reset-password`);
+    const url = customEndpoint || getAuthEndpoint("resetPassword");
 
     cancel();
     abortControllerRef.current = new AbortController();
@@ -198,7 +190,7 @@ export const useAuth = () => {
 
   const changePassword = useCallback(async (options: MutationOptions<ChangePasswordData> = {}): Promise<AuthApiResponse<ChangePasswordResponse> | null> => {
     const { data: passwordData, customEndpoint, onSuccess, onError } = options;
-    const url = resolveUrl(customEndpoint || `${authBasePath}/change-password`);
+    const url = customEndpoint || getAuthEndpoint("changePassword");
 
     cancel();
     abortControllerRef.current = new AbortController();
@@ -235,7 +227,7 @@ export const useAuth = () => {
 
   const getAllUsers = useCallback(async (options: MutationOptions<void> = {}, retryAttempts = 0): Promise<AuthApiResponse<UsersListResponse> | null> => {
     const { customEndpoint, onSuccess, onError } = options;
-    const url = resolveUrl(customEndpoint || `${authBasePath}/users`);
+    const url = customEndpoint || getAuthEndpoint("users");
 
     cancel();
     abortControllerRef.current = new AbortController();
